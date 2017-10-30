@@ -1,5 +1,7 @@
 import { h, Component } from 'preact';
 import { Router } from 'preact-router';
+import Helmet from "preact-helmet";
+
 
 import Header from './header';
 import Home from '../routes/home';
@@ -19,6 +21,10 @@ export default class App extends Component {
 	render() {
 		return (
 			<div id="app">
+				<Helmet title="Bici.work">
+					<meta name="apple-mobile-web-app-capable" content="yes"/>
+					<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+				</Helmet>
 				<Header />
 				<Router onChange={this.handleRoute}>
 					<Home path="/" />
