@@ -66,10 +66,1176 @@ module.exports =
 /************************************************************************/
 /******/ ({
 
-/***/ "IpTH":
+/***/ "5rBR":
 /***/ (function(module, exports) {
 
 // removed by extract-text-webpack-plugin
+
+/***/ }),
+
+/***/ "Cxo9":
+/***/ (function(module, exports, __webpack_require__) {
+
+var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;/*! geolib 2.0.23 by Manuel Bieh
+* Library to provide geo functions like distance calculation,
+* conversion of decimal coordinates to sexagesimal and vice versa, etc.
+* WGS 84 (World Geodetic System 1984)
+* 
+* @author Manuel Bieh
+* @url http://www.manuelbieh.com/
+* @version 2.0.23
+* @license MIT 
+**/;(function (global, undefined) {
+
+    "use strict";
+
+    function Geolib() {}
+
+    // Constants
+    Geolib.TO_RAD = Math.PI / 180;
+    Geolib.TO_DEG = 180 / Math.PI;
+    Geolib.PI_X2 = Math.PI * 2;
+    Geolib.PI_DIV4 = Math.PI / 4;
+
+    // Setting readonly defaults
+    var geolib = Object.create(Geolib.prototype, {
+        version: {
+            value: "2.0.23"
+        },
+        radius: {
+            value: 6378137
+        },
+        minLat: {
+            value: -90
+        },
+        maxLat: {
+            value: 90
+        },
+        minLon: {
+            value: -180
+        },
+        maxLon: {
+            value: 180
+        },
+        sexagesimalPattern: {
+            value: /^([0-9]{1,3})°\s*([0-9]{1,3}(?:\.(?:[0-9]{1,2}))?)'\s*(([0-9]{1,3}(\.([0-9]{1,4}))?)"\s*)?([NEOSW]?)$/
+        },
+        measures: {
+            value: Object.create(Object.prototype, {
+                "m": { value: 1 },
+                "km": { value: 0.001 },
+                "cm": { value: 100 },
+                "mm": { value: 1000 },
+                "mi": { value: 1 / 1609.344 },
+                "sm": { value: 1 / 1852.216 },
+                "ft": { value: 100 / 30.48 },
+                "in": { value: 100 / 2.54 },
+                "yd": { value: 1 / 0.9144 }
+            })
+        },
+        prototype: {
+            value: Geolib.prototype
+        },
+        extend: {
+            value: function value(methods, overwrite) {
+                for (var prop in methods) {
+                    if (typeof geolib.prototype[prop] === 'undefined' || overwrite === true) {
+                        if (typeof methods[prop] === 'function' && typeof methods[prop].bind === 'function') {
+                            geolib.prototype[prop] = methods[prop].bind(geolib);
+                        } else {
+                            geolib.prototype[prop] = methods[prop];
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    if (typeof Number.prototype.toRad === 'undefined') {
+        Number.prototype.toRad = function () {
+            return this * Geolib.TO_RAD;
+        };
+    }
+
+    if (typeof Number.prototype.toDeg === 'undefined') {
+        Number.prototype.toDeg = function () {
+            return this * Geolib.TO_DEG;
+        };
+    }
+
+    // Here comes the magic
+    geolib.extend({
+
+        decimal: {},
+
+        sexagesimal: {},
+
+        distance: null,
+
+        getKeys: function getKeys(point) {
+
+            // GeoJSON Array [longitude, latitude(, elevation)]
+            if (Object.prototype.toString.call(point) == '[object Array]') {
+
+                return {
+                    longitude: point.length >= 1 ? 0 : undefined,
+                    latitude: point.length >= 2 ? 1 : undefined,
+                    elevation: point.length >= 3 ? 2 : undefined
+                };
+            }
+
+            var getKey = function getKey(possibleValues) {
+
+                var key;
+
+                possibleValues.every(function (val) {
+                    // TODO: check if point is an object
+                    if (typeof point != 'object') {
+                        return true;
+                    }
+                    return point.hasOwnProperty(val) ? function () {
+                        key = val;return false;
+                    }() : true;
+                });
+
+                return key;
+            };
+
+            var longitude = getKey(['lng', 'lon', 'longitude']);
+            var latitude = getKey(['lat', 'latitude']);
+            var elevation = getKey(['alt', 'altitude', 'elevation', 'elev']);
+
+            // return undefined if not at least one valid property was found
+            if (typeof latitude == 'undefined' && typeof longitude == 'undefined' && typeof elevation == 'undefined') {
+                return undefined;
+            }
+
+            return {
+                latitude: latitude,
+                longitude: longitude,
+                elevation: elevation
+            };
+        },
+
+        // returns latitude of a given point, converted to decimal
+        // set raw to true to avoid conversion
+        getLat: function getLat(point, raw) {
+            return raw === true ? point[this.getKeys(point).latitude] : this.useDecimal(point[this.getKeys(point).latitude]);
+        },
+
+        // Alias for getLat
+        latitude: function latitude(point) {
+            return this.getLat.call(this, point);
+        },
+
+        // returns longitude of a given point, converted to decimal
+        // set raw to true to avoid conversion
+        getLon: function getLon(point, raw) {
+            return raw === true ? point[this.getKeys(point).longitude] : this.useDecimal(point[this.getKeys(point).longitude]);
+        },
+
+        // Alias for getLon
+        longitude: function longitude(point) {
+            return this.getLon.call(this, point);
+        },
+
+        getElev: function getElev(point) {
+            return point[this.getKeys(point).elevation];
+        },
+
+        // Alias for getElev
+        elevation: function elevation(point) {
+            return this.getElev.call(this, point);
+        },
+
+        coords: function coords(point, raw) {
+
+            var retval = {
+                latitude: raw === true ? point[this.getKeys(point).latitude] : this.useDecimal(point[this.getKeys(point).latitude]),
+                longitude: raw === true ? point[this.getKeys(point).longitude] : this.useDecimal(point[this.getKeys(point).longitude])
+            };
+
+            var elev = point[this.getKeys(point).elevation];
+
+            if (typeof elev !== 'undefined') {
+                retval['elevation'] = elev;
+            }
+
+            return retval;
+        },
+
+        // Alias for coords
+        ll: function ll(point, raw) {
+            return this.coords.call(this, point, raw);
+        },
+
+        // checks if a variable contains a valid latlong object
+        validate: function validate(point) {
+
+            var keys = this.getKeys(point);
+
+            if (typeof keys === 'undefined' || typeof keys.latitude === 'undefined' || keys.longitude === 'undefined') {
+                return false;
+            }
+
+            var lat = point[keys.latitude];
+            var lng = point[keys.longitude];
+
+            if (typeof lat === 'undefined' || !this.isDecimal(lat) && !this.isSexagesimal(lat)) {
+                return false;
+            }
+
+            if (typeof lng === 'undefined' || !this.isDecimal(lng) && !this.isSexagesimal(lng)) {
+                return false;
+            }
+
+            lat = this.useDecimal(lat);
+            lng = this.useDecimal(lng);
+
+            if (lat < this.minLat || lat > this.maxLat || lng < this.minLon || lng > this.maxLon) {
+                return false;
+            }
+
+            return true;
+        },
+
+        /**
+        * Calculates geodetic distance between two points specified by latitude/longitude using
+        * Vincenty inverse formula for ellipsoids
+        * Vincenty Inverse Solution of Geodesics on the Ellipsoid (c) Chris Veness 2002-2010
+        * (Licensed under CC BY 3.0)
+        *
+        * @param    object    Start position {latitude: 123, longitude: 123}
+        * @param    object    End position {latitude: 123, longitude: 123}
+        * @param    integer   Accuracy (in meters)
+        * @param    integer   Precision (in decimal cases)
+        * @return   integer   Distance (in meters)
+        */
+        getDistance: function getDistance(start, end, accuracy, precision) {
+
+            accuracy = Math.floor(accuracy) || 1;
+            precision = Math.floor(precision) || 0;
+
+            var s = this.coords(start);
+            var e = this.coords(end);
+
+            var a = 6378137,
+                b = 6356752.314245,
+                f = 1 / 298.257223563; // WGS-84 ellipsoid params
+            var L = (e['longitude'] - s['longitude']).toRad();
+
+            var cosSigma, sigma, sinAlpha, cosSqAlpha, cos2SigmaM, sinSigma;
+
+            var U1 = Math.atan((1 - f) * Math.tan(parseFloat(s['latitude']).toRad()));
+            var U2 = Math.atan((1 - f) * Math.tan(parseFloat(e['latitude']).toRad()));
+            var sinU1 = Math.sin(U1),
+                cosU1 = Math.cos(U1);
+            var sinU2 = Math.sin(U2),
+                cosU2 = Math.cos(U2);
+
+            var lambda = L,
+                lambdaP,
+                iterLimit = 100;
+            do {
+                var sinLambda = Math.sin(lambda),
+                    cosLambda = Math.cos(lambda);
+                sinSigma = Math.sqrt(cosU2 * sinLambda * (cosU2 * sinLambda) + (cosU1 * sinU2 - sinU1 * cosU2 * cosLambda) * (cosU1 * sinU2 - sinU1 * cosU2 * cosLambda));
+                if (sinSigma === 0) {
+                    return geolib.distance = 0; // co-incident points
+                }
+
+                cosSigma = sinU1 * sinU2 + cosU1 * cosU2 * cosLambda;
+                sigma = Math.atan2(sinSigma, cosSigma);
+                sinAlpha = cosU1 * cosU2 * sinLambda / sinSigma;
+                cosSqAlpha = 1 - sinAlpha * sinAlpha;
+                cos2SigmaM = cosSigma - 2 * sinU1 * sinU2 / cosSqAlpha;
+
+                if (isNaN(cos2SigmaM)) {
+                    cos2SigmaM = 0; // equatorial line: cosSqAlpha=0 (§6)
+                }
+                var C = f / 16 * cosSqAlpha * (4 + f * (4 - 3 * cosSqAlpha));
+                lambdaP = lambda;
+                lambda = L + (1 - C) * f * sinAlpha * (sigma + C * sinSigma * (cos2SigmaM + C * cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM)));
+            } while (Math.abs(lambda - lambdaP) > 1e-12 && --iterLimit > 0);
+
+            if (iterLimit === 0) {
+                return NaN; // formula failed to converge
+            }
+
+            var uSq = cosSqAlpha * (a * a - b * b) / (b * b);
+
+            var A = 1 + uSq / 16384 * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq)));
+
+            var B = uSq / 1024 * (256 + uSq * (-128 + uSq * (74 - 47 * uSq)));
+
+            var deltaSigma = B * sinSigma * (cos2SigmaM + B / 4 * (cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM) - B / 6 * cos2SigmaM * (-3 + 4 * sinSigma * sinSigma) * (-3 + 4 * cos2SigmaM * cos2SigmaM)));
+
+            var distance = b * A * (sigma - deltaSigma);
+
+            distance = distance.toFixed(precision); // round to 1mm precision
+
+            //if (start.hasOwnProperty(elevation) && end.hasOwnProperty(elevation)) {
+            if (typeof this.elevation(start) !== 'undefined' && typeof this.elevation(end) !== 'undefined') {
+                var climb = Math.abs(this.elevation(start) - this.elevation(end));
+                distance = Math.sqrt(distance * distance + climb * climb);
+            }
+
+            return this.distance = Math.round(distance * Math.pow(10, precision) / accuracy) * accuracy / Math.pow(10, precision);
+
+            /*
+            // note: to return initial/final bearings in addition to distance, use something like:
+            var fwdAz = Math.atan2(cosU2*sinLambda,  cosU1*sinU2-sinU1*cosU2*cosLambda);
+            var revAz = Math.atan2(cosU1*sinLambda, -sinU1*cosU2+cosU1*sinU2*cosLambda);
+             return { distance: s, initialBearing: fwdAz.toDeg(), finalBearing: revAz.toDeg() };
+            */
+        },
+
+        /**
+        * Calculates the distance between two spots.
+        * This method is more simple but also far more inaccurate
+        *
+        * @param    object    Start position {latitude: 123, longitude: 123}
+        * @param    object    End position {latitude: 123, longitude: 123}
+        * @param    integer   Accuracy (in meters)
+        * @return   integer   Distance (in meters)
+        */
+        getDistanceSimple: function getDistanceSimple(start, end, accuracy) {
+
+            accuracy = Math.floor(accuracy) || 1;
+
+            var distance = Math.round(Math.acos(Math.sin(this.latitude(end).toRad()) * Math.sin(this.latitude(start).toRad()) + Math.cos(this.latitude(end).toRad()) * Math.cos(this.latitude(start).toRad()) * Math.cos(this.longitude(start).toRad() - this.longitude(end).toRad())) * this.radius);
+
+            return geolib.distance = Math.floor(Math.round(distance / accuracy) * accuracy);
+        },
+
+        /**
+            * Calculates the center of a collection of geo coordinates
+            *
+            * @param        array       Collection of coords [{latitude: 51.510, longitude: 7.1321}, {latitude: 49.1238, longitude: "8° 30' W"}, ...]
+            * @return       object      {latitude: centerLat, longitude: centerLng}
+            */
+        getCenter: function getCenter(coords) {
+
+            var coordsArray = coords;
+            if (typeof coords === 'object' && !(coords instanceof Array)) {
+
+                coordsArray = [];
+
+                for (var key in coords) {
+                    coordsArray.push(this.coords(coords[key]));
+                }
+            }
+
+            if (!coordsArray.length) {
+                return false;
+            }
+
+            var X = 0.0;
+            var Y = 0.0;
+            var Z = 0.0;
+            var lat, lon, hyp;
+
+            coordsArray.forEach(function (coord) {
+
+                lat = this.latitude(coord).toRad();
+                lon = this.longitude(coord).toRad();
+
+                X += Math.cos(lat) * Math.cos(lon);
+                Y += Math.cos(lat) * Math.sin(lon);
+                Z += Math.sin(lat);
+            }, this);
+
+            var nb_coords = coordsArray.length;
+            X = X / nb_coords;
+            Y = Y / nb_coords;
+            Z = Z / nb_coords;
+
+            lon = Math.atan2(Y, X);
+            hyp = Math.sqrt(X * X + Y * Y);
+            lat = Math.atan2(Z, hyp);
+
+            return {
+                latitude: (lat * Geolib.TO_DEG).toFixed(6),
+                longitude: (lon * Geolib.TO_DEG).toFixed(6)
+            };
+        },
+
+        /**
+        * Gets the max and min, latitude, longitude, and elevation (if provided).
+        * @param        array       array with coords e.g. [{latitude: 51.5143, longitude: 7.4138}, {latitude: 123, longitude: 123}, ...]
+        * @return   object      {maxLat: maxLat,
+        *                     minLat: minLat
+        *                     maxLng: maxLng,
+        *                     minLng: minLng,
+        *                     maxElev: maxElev,
+        *                     minElev: minElev}
+        */
+        getBounds: function getBounds(coords) {
+
+            if (!coords.length) {
+                return false;
+            }
+
+            var useElevation = this.elevation(coords[0]);
+
+            var stats = {
+                maxLat: -Infinity,
+                minLat: Infinity,
+                maxLng: -Infinity,
+                minLng: Infinity
+            };
+
+            if (typeof useElevation != 'undefined') {
+                stats.maxElev = 0;
+                stats.minElev = Infinity;
+            }
+
+            for (var i = 0, l = coords.length; i < l; ++i) {
+
+                stats.maxLat = Math.max(this.latitude(coords[i]), stats.maxLat);
+                stats.minLat = Math.min(this.latitude(coords[i]), stats.minLat);
+                stats.maxLng = Math.max(this.longitude(coords[i]), stats.maxLng);
+                stats.minLng = Math.min(this.longitude(coords[i]), stats.minLng);
+
+                if (useElevation) {
+                    stats.maxElev = Math.max(this.elevation(coords[i]), stats.maxElev);
+                    stats.minElev = Math.min(this.elevation(coords[i]), stats.minElev);
+                }
+            }
+
+            return stats;
+        },
+
+        /**
+        * Calculates the center of the bounds of geo coordinates.
+        *
+        * On polygons like political borders (eg. states)
+        * this may gives a closer result to human expectation, than `getCenter`,
+        * because that function can be disturbed by uneven distribution of
+        * point in different sides.
+        * Imagine the US state Oklahoma: `getCenter` on that gives a southern
+        * point, because the southern border contains a lot more nodes,
+        * than the others.
+        *
+        * @param        array       Collection of coords [{latitude: 51.510, longitude: 7.1321}, {latitude: 49.1238, longitude: "8° 30' W"}, ...]
+        * @return       object      {latitude: centerLat, longitude: centerLng}
+        */
+        getCenterOfBounds: function getCenterOfBounds(coords) {
+            var b = this.getBounds(coords);
+            var latitude = b.minLat + (b.maxLat - b.minLat) / 2;
+            var longitude = b.minLng + (b.maxLng - b.minLng) / 2;
+            return {
+                latitude: parseFloat(latitude.toFixed(6)),
+                longitude: parseFloat(longitude.toFixed(6))
+            };
+        },
+
+        /**
+        * Computes the bounding coordinates of all points on the surface
+        * of the earth less than or equal to the specified great circle
+        * distance.
+        *
+        * @param object Point position {latitude: 123, longitude: 123}
+        * @param number Distance (in meters).
+        * @return array Collection of two points defining the SW and NE corners.
+        */
+        getBoundsOfDistance: function getBoundsOfDistance(point, distance) {
+
+            var latitude = this.latitude(point);
+            var longitude = this.longitude(point);
+
+            var radLat = latitude.toRad();
+            var radLon = longitude.toRad();
+
+            var radDist = distance / this.radius;
+            var minLat = radLat - radDist;
+            var maxLat = radLat + radDist;
+
+            var MAX_LAT_RAD = this.maxLat.toRad();
+            var MIN_LAT_RAD = this.minLat.toRad();
+            var MAX_LON_RAD = this.maxLon.toRad();
+            var MIN_LON_RAD = this.minLon.toRad();
+
+            var minLon;
+            var maxLon;
+
+            if (minLat > MIN_LAT_RAD && maxLat < MAX_LAT_RAD) {
+
+                var deltaLon = Math.asin(Math.sin(radDist) / Math.cos(radLat));
+                minLon = radLon - deltaLon;
+
+                if (minLon < MIN_LON_RAD) {
+                    minLon += Geolib.PI_X2;
+                }
+
+                maxLon = radLon + deltaLon;
+
+                if (maxLon > MAX_LON_RAD) {
+                    maxLon -= Geolib.PI_X2;
+                }
+            } else {
+                // A pole is within the distance.
+                minLat = Math.max(minLat, MIN_LAT_RAD);
+                maxLat = Math.min(maxLat, MAX_LAT_RAD);
+                minLon = MIN_LON_RAD;
+                maxLon = MAX_LON_RAD;
+            }
+
+            return [
+            // Southwest
+            {
+                latitude: minLat.toDeg(),
+                longitude: minLon.toDeg()
+            },
+            // Northeast
+            {
+                latitude: maxLat.toDeg(),
+                longitude: maxLon.toDeg()
+            }];
+        },
+
+        /**
+        * Checks whether a point is inside of a polygon or not.
+        * Note that the polygon coords must be in correct order!
+        *
+        * @param        object      coordinate to check e.g. {latitude: 51.5023, longitude: 7.3815}
+        * @param        array       array with coords e.g. [{latitude: 51.5143, longitude: 7.4138}, {latitude: 123, longitude: 123}, ...]
+        * @return       bool        true if the coordinate is inside the given polygon
+        */
+        isPointInside: function isPointInside(latlng, coords) {
+
+            for (var c = false, i = -1, l = coords.length, j = l - 1; ++i < l; j = i) {
+
+                if ((this.longitude(coords[i]) <= this.longitude(latlng) && this.longitude(latlng) < this.longitude(coords[j]) || this.longitude(coords[j]) <= this.longitude(latlng) && this.longitude(latlng) < this.longitude(coords[i])) && this.latitude(latlng) < (this.latitude(coords[j]) - this.latitude(coords[i])) * (this.longitude(latlng) - this.longitude(coords[i])) / (this.longitude(coords[j]) - this.longitude(coords[i])) + this.latitude(coords[i])) {
+                    c = !c;
+                }
+            }
+
+            return c;
+        },
+
+        /**
+         * Pre calculate the polygon coords, to speed up the point inside check.
+         * Use this function before calling isPointInsideWithPreparedPolygon()
+         * @see          Algorythm from http://alienryderflex.com/polygon/
+         * @param        array       array with coords e.g. [{latitude: 51.5143, longitude: 7.4138}, {latitude: 123, longitude: 123}, ...]
+         */
+        preparePolygonForIsPointInsideOptimized: function preparePolygonForIsPointInsideOptimized(coords) {
+
+            for (var i = 0, j = coords.length - 1; i < coords.length; i++) {
+
+                if (this.longitude(coords[j]) === this.longitude(coords[i])) {
+
+                    coords[i].constant = this.latitude(coords[i]);
+                    coords[i].multiple = 0;
+                } else {
+
+                    coords[i].constant = this.latitude(coords[i]) - this.longitude(coords[i]) * this.latitude(coords[j]) / (this.longitude(coords[j]) - this.longitude(coords[i])) + this.longitude(coords[i]) * this.latitude(coords[i]) / (this.longitude(coords[j]) - this.longitude(coords[i]));
+
+                    coords[i].multiple = (this.latitude(coords[j]) - this.latitude(coords[i])) / (this.longitude(coords[j]) - this.longitude(coords[i]));
+                }
+
+                j = i;
+            }
+        },
+
+        /**
+         * Checks whether a point is inside of a polygon or not.
+         * "This is useful if you have many points that need to be tested against the same (static) polygon."
+         * Please call the function preparePolygonForIsPointInsideOptimized() with the same coords object before using this function.
+         * Note that the polygon coords must be in correct order!
+         *
+         * @see          Algorythm from http://alienryderflex.com/polygon/
+         *
+         * @param     object      coordinate to check e.g. {latitude: 51.5023, longitude: 7.3815}
+         * @param     array       array with coords e.g. [{latitude: 51.5143, longitude: 7.4138}, {latitude: 123, longitude: 123}, ...]
+         * @return        bool        true if the coordinate is inside the given polygon
+         */
+        isPointInsideWithPreparedPolygon: function isPointInsideWithPreparedPolygon(point, coords) {
+
+            var flgPointInside = false,
+                y = this.longitude(point),
+                x = this.latitude(point);
+
+            for (var i = 0, j = coords.length - 1; i < coords.length; i++) {
+
+                if (this.longitude(coords[i]) < y && this.longitude(coords[j]) >= y || this.longitude(coords[j]) < y && this.longitude(coords[i]) >= y) {
+
+                    flgPointInside ^= y * coords[i].multiple + coords[i].constant < x;
+                }
+
+                j = i;
+            }
+
+            return flgPointInside;
+        },
+
+        /**
+        * Shortcut for geolib.isPointInside()
+        */
+        isInside: function isInside() {
+            return this.isPointInside.apply(this, arguments);
+        },
+
+        /**
+        * Checks whether a point is inside of a circle or not.
+        *
+        * @param        object      coordinate to check (e.g. {latitude: 51.5023, longitude: 7.3815})
+        * @param        object      coordinate of the circle's center (e.g. {latitude: 51.4812, longitude: 7.4025})
+        * @param        integer     maximum radius in meters
+        * @return       bool        true if the coordinate is within the given radius
+        */
+        isPointInCircle: function isPointInCircle(latlng, center, radius) {
+            return this.getDistance(latlng, center) < radius;
+        },
+
+        /**
+        * Shortcut for geolib.isPointInCircle()
+        */
+        withinRadius: function withinRadius() {
+            return this.isPointInCircle.apply(this, arguments);
+        },
+
+        /**
+        * Gets rhumb line bearing of two points. Find out about the difference between rhumb line and
+        * great circle bearing on Wikipedia. It's quite complicated. Rhumb line should be fine in most cases:
+        *
+        * http://en.wikipedia.org/wiki/Rhumb_line#General_and_mathematical_description
+        *
+        * Function heavily based on Doug Vanderweide's great PHP version (licensed under GPL 3.0)
+        * http://www.dougv.com/2009/07/13/calculating-the-bearing-and-compass-rose-direction-between-two-latitude-longitude-coordinates-in-php/
+        *
+        * @param        object      origin coordinate (e.g. {latitude: 51.5023, longitude: 7.3815})
+        * @param        object      destination coordinate
+        * @return       integer     calculated bearing
+        */
+        getRhumbLineBearing: function getRhumbLineBearing(originLL, destLL) {
+
+            // difference of longitude coords
+            var diffLon = this.longitude(destLL).toRad() - this.longitude(originLL).toRad();
+
+            // difference latitude coords phi
+            var diffPhi = Math.log(Math.tan(this.latitude(destLL).toRad() / 2 + Geolib.PI_DIV4) / Math.tan(this.latitude(originLL).toRad() / 2 + Geolib.PI_DIV4));
+
+            // recalculate diffLon if it is greater than pi
+            if (Math.abs(diffLon) > Math.PI) {
+                if (diffLon > 0) {
+                    diffLon = (Geolib.PI_X2 - diffLon) * -1;
+                } else {
+                    diffLon = Geolib.PI_X2 + diffLon;
+                }
+            }
+
+            //return the angle, normalized
+            return (Math.atan2(diffLon, diffPhi).toDeg() + 360) % 360;
+        },
+
+        /**
+        * Gets great circle bearing of two points. See description of getRhumbLineBearing for more information
+        *
+        * @param        object      origin coordinate (e.g. {latitude: 51.5023, longitude: 7.3815})
+        * @param        object      destination coordinate
+        * @return       integer     calculated bearing
+        */
+        getBearing: function getBearing(originLL, destLL) {
+
+            destLL['latitude'] = this.latitude(destLL);
+            destLL['longitude'] = this.longitude(destLL);
+            originLL['latitude'] = this.latitude(originLL);
+            originLL['longitude'] = this.longitude(originLL);
+
+            var bearing = (Math.atan2(Math.sin(destLL['longitude'].toRad() - originLL['longitude'].toRad()) * Math.cos(destLL['latitude'].toRad()), Math.cos(originLL['latitude'].toRad()) * Math.sin(destLL['latitude'].toRad()) - Math.sin(originLL['latitude'].toRad()) * Math.cos(destLL['latitude'].toRad()) * Math.cos(destLL['longitude'].toRad() - originLL['longitude'].toRad())).toDeg() + 360) % 360;
+
+            return bearing;
+        },
+
+        /**
+        * Gets the compass direction from an origin coordinate to a destination coordinate.
+        *
+        * @param        object      origin coordinate (e.g. {latitude: 51.5023, longitude: 7.3815})
+        * @param        object      destination coordinate
+        * @param        string      Bearing mode. Can be either circle or rhumbline
+        * @return       object      Returns an object with a rough (NESW) and an exact direction (NNE, NE, ENE, E, ESE, etc).
+        */
+        getCompassDirection: function getCompassDirection(originLL, destLL, bearingMode) {
+
+            var direction;
+            var bearing;
+
+            if (bearingMode == 'circle') {
+                // use great circle bearing
+                bearing = this.getBearing(originLL, destLL);
+            } else {
+                // default is rhumb line bearing
+                bearing = this.getRhumbLineBearing(originLL, destLL);
+            }
+
+            switch (Math.round(bearing / 22.5)) {
+                case 1:
+                    direction = { exact: "NNE", rough: "N" };
+                    break;
+                case 2:
+                    direction = { exact: "NE", rough: "N" };
+                    break;
+                case 3:
+                    direction = { exact: "ENE", rough: "E" };
+                    break;
+                case 4:
+                    direction = { exact: "E", rough: "E" };
+                    break;
+                case 5:
+                    direction = { exact: "ESE", rough: "E" };
+                    break;
+                case 6:
+                    direction = { exact: "SE", rough: "E" };
+                    break;
+                case 7:
+                    direction = { exact: "SSE", rough: "S" };
+                    break;
+                case 8:
+                    direction = { exact: "S", rough: "S" };
+                    break;
+                case 9:
+                    direction = { exact: "SSW", rough: "S" };
+                    break;
+                case 10:
+                    direction = { exact: "SW", rough: "S" };
+                    break;
+                case 11:
+                    direction = { exact: "WSW", rough: "W" };
+                    break;
+                case 12:
+                    direction = { exact: "W", rough: "W" };
+                    break;
+                case 13:
+                    direction = { exact: "WNW", rough: "W" };
+                    break;
+                case 14:
+                    direction = { exact: "NW", rough: "W" };
+                    break;
+                case 15:
+                    direction = { exact: "NNW", rough: "N" };
+                    break;
+                default:
+                    direction = { exact: "N", rough: "N" };
+            }
+
+            direction['bearing'] = bearing;
+            return direction;
+        },
+
+        /**
+        * Shortcut for getCompassDirection
+        */
+        getDirection: function getDirection(originLL, destLL, bearingMode) {
+            return this.getCompassDirection.apply(this, arguments);
+        },
+
+        /**
+        * Sorts an array of coords by distance from a reference coordinate
+        *
+        * @param        object      reference coordinate e.g. {latitude: 51.5023, longitude: 7.3815}
+        * @param        mixed       array or object with coords [{latitude: 51.5143, longitude: 7.4138}, {latitude: 123, longitude: 123}, ...]
+        * @return       array       ordered array
+        */
+        orderByDistance: function orderByDistance(latlng, coords) {
+
+            var coordsArray = Object.keys(coords).map(function (idx) {
+                var distance = this.getDistance(latlng, coords[idx]);
+                var augmentedCoord = Object.create(coords[idx]);
+                augmentedCoord.distance = distance;
+                augmentedCoord.key = idx;
+                return augmentedCoord;
+            }, this);
+
+            return coordsArray.sort(function (a, b) {
+                return a.distance - b.distance;
+            });
+        },
+
+        /**
+        * Check if a point lies in line created by two other points
+        *
+        * @param    object    Point to check: {latitude: 123, longitude: 123}
+        * @param    object    Start of line {latitude: 123, longitude: 123}
+        * @param    object    End of line {latitude: 123, longitude: 123}
+        * @return   boolean
+        */
+        isPointInLine: function isPointInLine(point, start, end) {
+
+            return (this.getDistance(start, point, 1, 3) + this.getDistance(point, end, 1, 3)).toFixed(3) == this.getDistance(start, end, 1, 3);
+        },
+
+        /**
+        * Check if a point lies within a given distance from a line created by two other points
+        *
+        * @param    object    Point to check: {latitude: 123, longitude: 123}
+        * @param    object    Start of line {latitude: 123, longitude: 123}
+        * @param    object    End of line {latitude: 123, longitude: 123}
+        * @pararm   float     maximum distance from line
+        * @return   boolean
+        */
+        isPointNearLine: function isPointNearLine(point, start, end, distance) {
+            return this.getDistanceFromLine(point, start, end) < distance;
+        },
+
+        /**
+        * return the minimum distance from a point to a line
+        *
+        * @param    object    Point away from line
+        * @param    object    Start of line {latitude: 123, longitude: 123}
+        * @param    object    End of line {latitude: 123, longitude: 123}
+        * @return   float     distance from point to line
+        */
+        getDistanceFromLine: function getDistanceFromLine(point, start, end) {
+            var d1 = this.getDistance(start, point, 1, 3);
+            var d2 = this.getDistance(point, end, 1, 3);
+            var d3 = this.getDistance(start, end, 1, 3);
+            var distance = 0;
+
+            // alpha is the angle between the line from start to point, and from start to end //
+            var alpha = Math.acos((d1 * d1 + d3 * d3 - d2 * d2) / (2 * d1 * d3));
+            // beta is the angle between the line from end to point and from end to start //
+            var beta = Math.acos((d2 * d2 + d3 * d3 - d1 * d1) / (2 * d2 * d3));
+
+            // if the angle is greater than 90 degrees, then the minimum distance is the
+            // line from the start to the point //
+            if (alpha > Math.PI / 2) {
+                distance = d1;
+            }
+            // same for the beta //
+            else if (beta > Math.PI / 2) {
+                    distance = d2;
+                }
+                // otherwise the minimum distance is achieved through a line perpendular to the start-end line,
+                // which goes from the start-end line to the point //
+                else {
+                        distance = Math.sin(alpha) * d1;
+                    }
+
+            return distance;
+        },
+
+        /**
+        * Finds the nearest coordinate to a reference coordinate
+        *
+        * @param        object      reference coordinate e.g. {latitude: 51.5023, longitude: 7.3815}
+        * @param        mixed       array or object with coords [{latitude: 51.5143, longitude: 7.4138}, {latitude: 123, longitude: 123}, ...]
+        * @return       array       ordered array
+        */
+        findNearest: function findNearest(latlng, coords, offset, limit) {
+
+            offset = offset || 0;
+            limit = limit || 1;
+            var ordered = this.orderByDistance(latlng, coords);
+
+            if (limit === 1) {
+                return ordered[offset];
+            } else {
+                return ordered.splice(offset, limit);
+            }
+        },
+
+        /**
+        * Calculates the length of a given path
+        *
+        * @param        mixed       array or object with coords [{latitude: 51.5143, longitude: 7.4138}, {latitude: 123, longitude: 123}, ...]
+        * @return       integer     length of the path (in meters)
+        */
+        getPathLength: function getPathLength(coords) {
+
+            var dist = 0;
+            var last;
+
+            for (var i = 0, l = coords.length; i < l; ++i) {
+                if (last) {
+                    //console.log(coords[i], last, this.getDistance(coords[i], last));
+                    dist += this.getDistance(this.coords(coords[i]), last);
+                }
+                last = this.coords(coords[i]);
+            }
+
+            return dist;
+        },
+
+        /**
+        * Calculates the speed between to points within a given time span.
+        *
+        * @param        object      coords with javascript timestamp {latitude: 51.5143, longitude: 7.4138, time: 1360231200880}
+        * @param        object      coords with javascript timestamp {latitude: 51.5502, longitude: 7.4323, time: 1360245600460}
+        * @param        object      options (currently "unit" is the only option. Default: km(h));
+        * @return       float       speed in unit per hour
+        */
+        getSpeed: function getSpeed(start, end, options) {
+
+            var unit = options && options.unit || 'km';
+
+            if (unit == 'mph') {
+                unit = 'mi';
+            } else if (unit == 'kmh') {
+                unit = 'km';
+            }
+
+            var distance = geolib.getDistance(start, end);
+            var time = end.time * 1 / 1000 - start.time * 1 / 1000;
+            var mPerHr = distance / time * 3600;
+            var speed = Math.round(mPerHr * this.measures[unit] * 10000) / 10000;
+            return speed;
+        },
+
+        /**
+         * Computes the destination point given an initial point, a distance
+         * and a bearing
+         *
+         * see http://www.movable-type.co.uk/scripts/latlong.html for the original code
+         *
+         * @param        object     start coordinate (e.g. {latitude: 51.5023, longitude: 7.3815})
+         * @param        float      longitude of the inital point in degree
+         * @param        float      distance to go from the inital point in meter
+         * @param        float      bearing in degree of the direction to go, e.g. 0 = north, 180 = south
+         * @param        float      optional (in meter), defaults to mean radius of the earth
+         * @return       object     {latitude: destLat (in degree), longitude: destLng (in degree)}
+         */
+        computeDestinationPoint: function computeDestinationPoint(start, distance, bearing, radius) {
+
+            var lat = this.latitude(start);
+            var lng = this.longitude(start);
+
+            radius = typeof radius === 'undefined' ? this.radius : Number(radius);
+
+            var δ = Number(distance) / radius; // angular distance in radians
+            var θ = Number(bearing).toRad();
+
+            var φ1 = Number(lat).toRad();
+            var λ1 = Number(lng).toRad();
+
+            var φ2 = Math.asin(Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(θ));
+            var λ2 = λ1 + Math.atan2(Math.sin(θ) * Math.sin(δ) * Math.cos(φ1), Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2));
+            λ2 = (λ2 + 3 * Math.PI) % (2 * Math.PI) - Math.PI; // normalise to -180..+180°
+
+            return {
+                latitude: φ2.toDeg(),
+                longitude: λ2.toDeg()
+            };
+        },
+
+        /**
+        * Converts a distance from meters to km, mm, cm, mi, ft, in or yd
+        *
+        * @param        string      Format to be converted in
+        * @param        float       Distance in meters
+        * @param        float       Decimal places for rounding (default: 4)
+        * @return       float       Converted distance
+        */
+        convertUnit: function convertUnit(unit, distance, round) {
+
+            if (distance === 0) {
+
+                return 0;
+            } else if (typeof distance === 'undefined') {
+
+                if (this.distance === null) {
+                    throw new Error('No distance was given');
+                } else if (this.distance === 0) {
+                    return 0;
+                } else {
+                    distance = this.distance;
+                }
+            }
+
+            unit = unit || 'm';
+            round = null == round ? 4 : round;
+
+            if (typeof this.measures[unit] !== 'undefined') {
+                return this.round(distance * this.measures[unit], round);
+            } else {
+                throw new Error('Unknown unit for conversion.');
+            }
+        },
+
+        /**
+        * Checks if a value is in decimal format or, if neccessary, converts to decimal
+        *
+        * @param        mixed       Value(s) to be checked/converted (array of latlng objects, latlng object, sexagesimal string, float)
+        * @return       float       Input data in decimal format
+        */
+        useDecimal: function useDecimal(value) {
+
+            if (Object.prototype.toString.call(value) === '[object Array]') {
+
+                var geolib = this;
+
+                value = value.map(function (val) {
+
+                    //if(!isNaN(parseFloat(val))) {
+                    if (geolib.isDecimal(val)) {
+
+                        return geolib.useDecimal(val);
+                    } else if (typeof val == 'object') {
+
+                        if (geolib.validate(val)) {
+
+                            return geolib.coords(val);
+                        } else {
+
+                            for (var prop in val) {
+                                val[prop] = geolib.useDecimal(val[prop]);
+                            }
+
+                            return val;
+                        }
+                    } else if (geolib.isSexagesimal(val)) {
+
+                        return geolib.sexagesimal2decimal(val);
+                    } else {
+
+                        return val;
+                    }
+                });
+
+                return value;
+            } else if (typeof value === 'object' && this.validate(value)) {
+
+                return this.coords(value);
+            } else if (typeof value === 'object') {
+
+                for (var prop in value) {
+                    value[prop] = this.useDecimal(value[prop]);
+                }
+
+                return value;
+            }
+
+            if (this.isDecimal(value)) {
+
+                return parseFloat(value);
+            } else if (this.isSexagesimal(value) === true) {
+
+                return parseFloat(this.sexagesimal2decimal(value));
+            }
+
+            throw new Error('Unknown format.');
+        },
+
+        /**
+        * Converts a decimal coordinate value to sexagesimal format
+        *
+        * @param        float       decimal
+        * @return       string      Sexagesimal value (XX° YY' ZZ")
+        */
+        decimal2sexagesimal: function decimal2sexagesimal(dec) {
+
+            if (dec in this.sexagesimal) {
+                return this.sexagesimal[dec];
+            }
+
+            var tmp = dec.toString().split('.');
+
+            var deg = Math.abs(tmp[0]);
+            var min = ('0.' + (tmp[1] || 0)) * 60;
+            var sec = min.toString().split('.');
+
+            min = Math.floor(min);
+            sec = (('0.' + (sec[1] || 0)) * 60).toFixed(2);
+
+            this.sexagesimal[dec] = deg + '° ' + min + "' " + sec + '"';
+
+            return this.sexagesimal[dec];
+        },
+
+        /**
+        * Converts a sexagesimal coordinate to decimal format
+        *
+        * @param        float       Sexagesimal coordinate
+        * @return       string      Decimal value (XX.XXXXXXXX)
+        */
+        sexagesimal2decimal: function sexagesimal2decimal(sexagesimal) {
+
+            if (sexagesimal in this.decimal) {
+                return this.decimal[sexagesimal];
+            }
+
+            var regEx = new RegExp(this.sexagesimalPattern);
+            var data = regEx.exec(sexagesimal);
+            var min = 0,
+                sec = 0;
+
+            if (data) {
+                min = parseFloat(data[2] / 60);
+                sec = parseFloat(data[4] / 3600) || 0;
+            }
+
+            var dec = (parseFloat(data[1]) + min + sec).toFixed(8);
+            //var   dec = ((parseFloat(data[1]) + min + sec));
+
+            // South and West are negative decimals
+            dec = data[7] == 'S' || data[7] == 'W' ? parseFloat(-dec) : parseFloat(dec);
+            //dec = (data[7] == 'S' || data[7] == 'W') ? -dec : dec;
+
+            this.decimal[sexagesimal] = dec;
+
+            return dec;
+        },
+
+        /**
+        * Checks if a value is in decimal format
+        *
+        * @param        string      Value to be checked
+        * @return       bool        True if in sexagesimal format
+        */
+        isDecimal: function isDecimal(value) {
+
+            value = value.toString().replace(/\s*/, '');
+
+            // looks silly but works as expected
+            // checks if value is in decimal format
+            return !isNaN(parseFloat(value)) && parseFloat(value) == value;
+        },
+
+        /**
+        * Checks if a value is in sexagesimal format
+        *
+        * @param        string      Value to be checked
+        * @return       bool        True if in sexagesimal format
+        */
+        isSexagesimal: function isSexagesimal(value) {
+
+            value = value.toString().replace(/\s*/, '');
+
+            return this.sexagesimalPattern.test(value);
+        },
+
+        round: function round(value, n) {
+            var decPlace = Math.pow(10, n);
+            return Math.round(value * decPlace) / decPlace;
+        }
+
+    });
+
+    // Node module
+    if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
+
+        module.exports = geolib;
+
+        // react native
+        if (typeof global === 'object') {
+            global.geolib = geolib;
+        }
+
+        // AMD module
+    } else if (true) {
+
+        !(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_RESULT__ = function () {
+            return geolib;
+        }.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+
+        // we're in a browser
+    } else {
+
+        global.geolib = geolib;
+    }
+})(this);
 
 /***/ }),
 
@@ -830,7 +1996,7 @@ var MDCRippleAdapter = function () {
   return MDCRippleAdapter;
 }();
 
-/* harmony default export */ var ripple_adapter = (MDCRippleAdapter);
+/* harmony default export */ var adapter = (MDCRippleAdapter);
 // CONCATENATED MODULE: ../node_modules/@material/ripple/constants.js
 /**
  * @license
@@ -4268,420 +5434,345 @@ Drawer.PersistentDrawerHeader = Drawer_PersistentDrawerHeader;
 Drawer.PersistentDrawerContent = PersistentDrawerContent;
 
 /* harmony default export */ var preact_material_components_Drawer = (Drawer);
-// CONCATENATED MODULE: ../node_modules/@material/dialog/constants.js
-/**
- * Copyright 2016 Google Inc. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// EXTERNAL MODULE: ../node_modules/preact-material-components/Drawer/style.css
+var Drawer_style = __webpack_require__("RYBc");
+var Drawer_style_default = /*#__PURE__*/__webpack_require__.n(Drawer_style);
 
-var dialog_constants_cssClasses = {
-  ROOT: 'mdc-dialog',
-  OPEN: 'mdc-dialog--open',
-  ANIMATING: 'mdc-dialog--animating',
-  BACKDROP: 'mdc-dialog__backdrop',
-  SCROLL_LOCK: 'mdc-dialog-scroll-lock',
-  ACCEPT_BTN: 'mdc-dialog__footer__button--accept',
-  CANCEL_BTN: 'mdc-dialog__footer__button--cancel'
-};
+// EXTERNAL MODULE: ../node_modules/preact-material-components/List/style.css
+var List_style = __webpack_require__("u+vq");
+var List_style_default = /*#__PURE__*/__webpack_require__.n(List_style);
 
-var dialog_constants_strings = {
-  OPEN_DIALOG_SELECTOR: '.mdc-dialog--open',
-  DIALOG_SURFACE_SELECTOR: '.mdc-dialog__surface',
-  ACCEPT_SELECTOR: '.mdc-dialog__footer__button--accept',
-  ACCEPT_EVENT: 'MDCDialog:accept',
-  CANCEL_EVENT: 'MDCDialog:cancel'
-};
-// CONCATENATED MODULE: ../node_modules/@material/dialog/foundation.js
-var dialog_foundation__extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+// EXTERNAL MODULE: ../node_modules/preact-material-components/Toolbar/style.css
+var Toolbar_style = __webpack_require__("LbTS");
+var Toolbar_style_default = /*#__PURE__*/__webpack_require__.n(Toolbar_style);
 
-var dialog_foundation__createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+// CONCATENATED MODULE: ./components/header/index.js
 
-function dialog_foundation__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-function dialog_foundation__possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+function header__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-function dialog_foundation__inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+function header__possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
 
-/**
- * Copyright 2017 Google Inc. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+function header__inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
 
 
 
-var foundation_MDCDialogFoundation = function (_MDCFoundation) {
-  dialog_foundation__inherits(MDCDialogFoundation, _MDCFoundation);
 
-  dialog_foundation__createClass(MDCDialogFoundation, null, [{
-    key: 'cssClasses',
-    get: function get() {
-      return dialog_constants_cssClasses;
+
+// import Dialog from 'preact-material-components/Dialog';
+// import Switch from 'preact-material-components/Switch';
+// import 'preact-material-components/Switch/style.css';
+// import 'preact-material-components/Dialog/style.css';
+
+
+
+// import style from './style';
+
+var header__ref = Object(preact_min["h"])(
+	preact_material_components_Toolbar.Title,
+	null,
+	'Bici.work'
+);
+
+var header__ref2 = Object(preact_min["h"])(
+	preact_material_components_List.ItemIcon,
+	null,
+	'home'
+);
+
+var _ref3 = Object(preact_min["h"])(
+	preact_material_components_List.ItemIcon,
+	null,
+	'account_circle'
+);
+
+var header_Header = function (_Component) {
+	header__inherits(Header, _Component);
+
+	function Header() {
+		header__classCallCheck(this, Header);
+
+		return header__possibleConstructorReturn(this, _Component.apply(this, arguments));
+	}
+
+	Header.prototype.closeDrawer = function closeDrawer() {
+		this.drawer.MDComponent.open = false;
+		this.state = {
+			darkThemeEnabled: false
+		};
+	};
+
+	Header.prototype.render = function render() {
+		var _this2 = this;
+
+		return Object(preact_min["h"])(
+			'div',
+			null,
+			Object(preact_min["h"])(
+				preact_material_components_Toolbar,
+				{ className: 'toolbar' },
+				Object(preact_min["h"])(
+					preact_material_components_Toolbar.Row,
+					null,
+					Object(preact_min["h"])(
+						preact_material_components_Toolbar.Section,
+						{ 'align-start': true },
+						Object(preact_min["h"])(
+							preact_material_components_Toolbar.Icon,
+							{ menu: true, onClick: function onClick() {
+									_this2.drawer.MDComponent.open = true;
+								} },
+							'menu'
+						),
+						header__ref
+					)
+				)
+			),
+			Object(preact_min["h"])(
+				preact_material_components_Drawer.TemporaryDrawer,
+				{ ref: function ref(drawer) {
+						_this2.drawer = drawer;
+					} },
+				Object(preact_min["h"])(
+					preact_material_components_Drawer.TemporaryDrawerContent,
+					null,
+					Object(preact_min["h"])(
+						preact_material_components_List,
+						null,
+						Object(preact_min["h"])(
+							preact_material_components_List.LinkItem,
+							{ onClick: function onClick() {
+									route('/');_this2.closeDrawer();
+								} },
+							header__ref2,
+							'Home'
+						),
+						Object(preact_min["h"])(
+							preact_material_components_List.LinkItem,
+							{ onClick: function onClick() {
+									route('/profile');_this2.closeDrawer();
+								} },
+							_ref3,
+							'Profile'
+						)
+					)
+				)
+			)
+		);
+	};
+
+	return Header;
+}(preact_min["Component"]);
+
+
+// EXTERNAL MODULE: ../node_modules/preact-material-components/Card/style.css
+var Card_style = __webpack_require__("UlEV");
+var Card_style_default = /*#__PURE__*/__webpack_require__.n(Card_style);
+
+// EXTERNAL MODULE: ../node_modules/preact-material-components/Button/style.css
+var Button_style = __webpack_require__("aqQ4");
+var Button_style_default = /*#__PURE__*/__webpack_require__.n(Button_style);
+
+// EXTERNAL MODULE: ./routes/home/style.css
+var home_style = __webpack_require__("ZAL5");
+var home_style_default = /*#__PURE__*/__webpack_require__.n(home_style);
+
+// EXTERNAL MODULE: ./components/list-container/style.css
+var list_container_style = __webpack_require__("5rBR");
+var list_container_style_default = /*#__PURE__*/__webpack_require__.n(list_container_style);
+
+// EXTERNAL MODULE: ../node_modules/geolib/dist/geolib.js
+var geolib = __webpack_require__("Cxo9");
+var geolib_default = /*#__PURE__*/__webpack_require__.n(geolib);
+
+// CONCATENATED MODULE: ./components/list-container/index.js
+
+
+function list_container__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function list_container__possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function list_container__inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+
+
+
+
+
+
+var list_container_ListContainer = function (_Component) {
+  list_container__inherits(ListContainer, _Component);
+
+  function ListContainer() {
+    var _temp, _this, _ret;
+
+    list_container__classCallCheck(this, ListContainer);
+
+    for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
     }
-  }, {
-    key: 'strings',
-    get: function get() {
-      return dialog_constants_strings;
-    }
-  }, {
-    key: 'defaultAdapter',
-    get: function get() {
-      return {
-        addClass: function addClass() /* className: string */{},
-        removeClass: function removeClass() /* className: string */{},
-        addBodyClass: function addBodyClass() /* className: string */{},
-        removeBodyClass: function removeBodyClass() /* className: string */{},
-        eventTargetHasClass: function eventTargetHasClass() {
-          return (/* target: EventTarget, className: string */ /* boolean */false
-          );
-        },
-        registerInteractionHandler: function registerInteractionHandler() /* evt: string, handler: EventListener */{},
-        deregisterInteractionHandler: function deregisterInteractionHandler() /* evt: string, handler: EventListener */{},
-        registerSurfaceInteractionHandler: function registerSurfaceInteractionHandler() /* evt: string, handler: EventListener */{},
-        deregisterSurfaceInteractionHandler: function deregisterSurfaceInteractionHandler() /* evt: string, handler: EventListener */{},
-        registerDocumentKeydownHandler: function registerDocumentKeydownHandler() /* handler: EventListener */{},
-        deregisterDocumentKeydownHandler: function deregisterDocumentKeydownHandler() /* handler: EventListener */{},
-        registerTransitionEndHandler: function registerTransitionEndHandler() /* handler: EventListener */{},
-        deregisterTransitionEndHandler: function deregisterTransitionEndHandler() /* handler: EventListener */{},
-        notifyAccept: function notifyAccept() {},
-        notifyCancel: function notifyCancel() {},
-        trapFocusOnSurface: function trapFocusOnSurface() {},
-        untrapFocusOnSurface: function untrapFocusOnSurface() {},
-        isDialog: function isDialog() {
-          return (/* el: Element */ /* boolean */false
-          );
-        },
-        layoutFooterRipples: function layoutFooterRipples() {}
-      };
-    }
-  }]);
 
-  function MDCDialogFoundation(adapter) {
-    dialog_foundation__classCallCheck(this, MDCDialogFoundation);
-
-    var _this = dialog_foundation__possibleConstructorReturn(this, _MDCFoundation.call(this, dialog_foundation__extends(MDCDialogFoundation.defaultAdapter, adapter)));
-
-    _this.isOpen_ = false;
-    _this.componentClickHandler_ = function (evt) {
-      if (_this.adapter_.eventTargetHasClass(evt.target, dialog_constants_cssClasses.BACKDROP)) {
-        _this.cancel(true);
-      }
-    };
-    _this.dialogClickHandler_ = function (evt) {
-      return _this.handleDialogClick_(evt);
-    };
-    _this.documentKeydownHandler_ = function (evt) {
-      if (evt.key && evt.key === 'Escape' || evt.keyCode === 27) {
-        _this.cancel(true);
-      }
-    };
-    _this.transitionEndHandler_ = function (evt) {
-      return _this.handleTransitionEnd_(evt);
-    };
-    return _this;
+    return _ret = (_temp = (_this = list_container__possibleConstructorReturn(this, _Component.call.apply(_Component, [this].concat(args))), _this), _this.state = {
+      listStations: []
+    }, _temp), list_container__possibleConstructorReturn(_this, _ret);
   }
 
-  MDCDialogFoundation.prototype.destroy = function destroy() {
-    // Ensure that dialog is cleaned up when destroyed
-    if (this.isOpen_) {
-      this.adapter_.deregisterSurfaceInteractionHandler('click', this.dialogClickHandler_);
-      this.adapter_.deregisterDocumentKeydownHandler(this.documentKeydownHandler_);
-      this.adapter_.deregisterInteractionHandler('click', this.componentClickHandler_);
-      this.adapter_.untrapFocusOnSurface();
-      this.adapter_.deregisterTransitionEndHandler(this.transitionEndHandler_);
-      this.adapter_.removeClass(MDCDialogFoundation.cssClasses.ANIMATING);
-      this.adapter_.removeClass(MDCDialogFoundation.cssClasses.OPEN);
-      this.enableScroll_();
-    }
-  };
-
-  MDCDialogFoundation.prototype.open = function open() {
-    this.isOpen_ = true;
-    this.disableScroll_();
-    this.adapter_.registerDocumentKeydownHandler(this.documentKeydownHandler_);
-    this.adapter_.registerSurfaceInteractionHandler('click', this.dialogClickHandler_);
-    this.adapter_.registerInteractionHandler('click', this.componentClickHandler_);
-    this.adapter_.registerTransitionEndHandler(this.transitionEndHandler_);
-    this.adapter_.addClass(MDCDialogFoundation.cssClasses.ANIMATING);
-    this.adapter_.addClass(MDCDialogFoundation.cssClasses.OPEN);
-  };
-
-  MDCDialogFoundation.prototype.close = function close() {
-    this.isOpen_ = false;
-    this.adapter_.deregisterSurfaceInteractionHandler('click', this.dialogClickHandler_);
-    this.adapter_.deregisterDocumentKeydownHandler(this.documentKeydownHandler_);
-    this.adapter_.deregisterInteractionHandler('click', this.componentClickHandler_);
-    this.adapter_.untrapFocusOnSurface();
-    this.adapter_.registerTransitionEndHandler(this.transitionEndHandler_);
-    this.adapter_.addClass(MDCDialogFoundation.cssClasses.ANIMATING);
-    this.adapter_.removeClass(MDCDialogFoundation.cssClasses.OPEN);
-  };
-
-  MDCDialogFoundation.prototype.isOpen = function isOpen() {
-    return this.isOpen_;
-  };
-
-  MDCDialogFoundation.prototype.accept = function accept(shouldNotify) {
-    if (shouldNotify) {
-      this.adapter_.notifyAccept();
-    }
-
-    this.close();
-  };
-
-  MDCDialogFoundation.prototype.cancel = function cancel(shouldNotify) {
-    if (shouldNotify) {
-      this.adapter_.notifyCancel();
-    }
-
-    this.close();
-  };
-
-  MDCDialogFoundation.prototype.handleDialogClick_ = function handleDialogClick_(evt) {
-    var target = evt.target;
-
-    if (this.adapter_.eventTargetHasClass(target, dialog_constants_cssClasses.ACCEPT_BTN)) {
-      this.accept(true);
-    } else if (this.adapter_.eventTargetHasClass(target, dialog_constants_cssClasses.CANCEL_BTN)) {
-      this.cancel(true);
-    }
-  };
-
-  MDCDialogFoundation.prototype.handleTransitionEnd_ = function handleTransitionEnd_(evt) {
-    if (this.adapter_.isDialog(evt.target)) {
-      this.adapter_.deregisterTransitionEndHandler(this.transitionEndHandler_);
-      this.adapter_.removeClass(MDCDialogFoundation.cssClasses.ANIMATING);
-      if (this.isOpen_) {
-        this.adapter_.trapFocusOnSurface();
-        this.adapter_.layoutFooterRipples();
-      } else {
-        this.enableScroll_();
-      };
-    };
-  };
-
-  MDCDialogFoundation.prototype.disableScroll_ = function disableScroll_() {
-    this.adapter_.addBodyClass(dialog_constants_cssClasses.SCROLL_LOCK);
-  };
-
-  MDCDialogFoundation.prototype.enableScroll_ = function enableScroll_() {
-    this.adapter_.removeBodyClass(dialog_constants_cssClasses.SCROLL_LOCK);
-  };
-
-  return MDCDialogFoundation;
-}(foundation);
-
-
-// EXTERNAL MODULE: ../node_modules/focus-trap/index.js
-var focus_trap = __webpack_require__("ySUw");
-var focus_trap_default = /*#__PURE__*/__webpack_require__.n(focus_trap);
-
-// CONCATENATED MODULE: ../node_modules/@material/dialog/util.js
-/**
- * Copyright 2016 Google Inc. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-
-
-function createFocusTrapInstance(surfaceEl, acceptButtonEl) {
-  var focusTrapFactory = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : focus_trap_default.a;
-
-  return focusTrapFactory(surfaceEl, {
-    initialFocus: acceptButtonEl,
-    clickOutsideDeactivates: true
-  });
-}
-// CONCATENATED MODULE: ../node_modules/@material/dialog/index.js
-var dialog__createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
-
-function dialog__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function dialog__possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function dialog__inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-/**
- * Copyright 2017 Google Inc. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-
-
-
-
-
-
-
-
-
-var dialog_MDCDialog = function (_MDCComponent) {
-  dialog__inherits(MDCDialog, _MDCComponent);
-
-  function MDCDialog() {
-    dialog__classCallCheck(this, MDCDialog);
-
-    return dialog__possibleConstructorReturn(this, _MDCComponent.apply(this, arguments));
-  }
-
-  MDCDialog.attachTo = function attachTo(root) {
-    return new MDCDialog(root);
-  };
-
-  MDCDialog.prototype.initialize = function initialize() {
-    this.focusTrap_ = createFocusTrapInstance(this.dialogSurface_, this.acceptButton_);
-    this.footerBtnRipples_ = [];
-
-    var footerBtns = this.root_.querySelectorAll('.mdc-dialog__footer__button');
-    for (var i = 0, footerBtn; footerBtn = footerBtns[i]; i++) {
-      this.footerBtnRipples_.push(new ripple_MDCRipple(footerBtn));
-    }
-  };
-
-  MDCDialog.prototype.destroy = function destroy() {
-    this.footerBtnRipples_.forEach(function (ripple) {
-      return ripple.destroy();
-    });
-    _MDCComponent.prototype.destroy.call(this);
-  };
-
-  MDCDialog.prototype.show = function show() {
-    this.foundation_.open();
-  };
-
-  MDCDialog.prototype.close = function close() {
-    this.foundation_.close();
-  };
-
-  MDCDialog.prototype.getDefaultFoundation = function getDefaultFoundation() {
+  ListContainer.prototype.componentDidMount = function componentDidMount() {
     var _this2 = this;
 
-    return new foundation_MDCDialogFoundation({
-      addClass: function addClass(className) {
-        return _this2.root_.classList.add(className);
-      },
-      removeClass: function removeClass(className) {
-        return _this2.root_.classList.remove(className);
-      },
-      addBodyClass: function addBodyClass(className) {
-        return document.body.classList.add(className);
-      },
-      removeBodyClass: function removeBodyClass(className) {
-        return document.body.classList.remove(className);
-      },
-      eventTargetHasClass: function eventTargetHasClass(target, className) {
-        return target.classList.contains(className);
-      },
-      registerInteractionHandler: function registerInteractionHandler(evt, handler) {
-        return _this2.root_.addEventListener(evt, handler);
-      },
-      deregisterInteractionHandler: function deregisterInteractionHandler(evt, handler) {
-        return _this2.root_.removeEventListener(evt, handler);
-      },
-      registerSurfaceInteractionHandler: function registerSurfaceInteractionHandler(evt, handler) {
-        return _this2.dialogSurface_.addEventListener(evt, handler);
-      },
-      deregisterSurfaceInteractionHandler: function deregisterSurfaceInteractionHandler(evt, handler) {
-        return _this2.dialogSurface_.removeEventListener(evt, handler);
-      },
-      registerDocumentKeydownHandler: function registerDocumentKeydownHandler(handler) {
-        return document.addEventListener('keydown', handler);
-      },
-      deregisterDocumentKeydownHandler: function deregisterDocumentKeydownHandler(handler) {
-        return document.removeEventListener('keydown', handler);
-      },
-      registerTransitionEndHandler: function registerTransitionEndHandler(handler) {
-        return _this2.dialogSurface_.addEventListener('transitionend', handler);
-      },
-      deregisterTransitionEndHandler: function deregisterTransitionEndHandler(handler) {
-        return _this2.dialogSurface_.removeEventListener('transitionend', handler);
-      },
-      notifyAccept: function notifyAccept() {
-        return _this2.emit(foundation_MDCDialogFoundation.strings.ACCEPT_EVENT);
-      },
-      notifyCancel: function notifyCancel() {
-        return _this2.emit(foundation_MDCDialogFoundation.strings.CANCEL_EVENT);
-      },
-      trapFocusOnSurface: function trapFocusOnSurface() {
-        return _this2.focusTrap_.activate();
-      },
-      untrapFocusOnSurface: function untrapFocusOnSurface() {
-        return _this2.focusTrap_.deactivate();
-      },
-      isDialog: function isDialog(el) {
-        return el === _this2.dialogSurface_;
-      },
-      layoutFooterRipples: function layoutFooterRipples() {
-        return _this2.footerBtnRipples_.forEach(function (ripple) {
-          return ripple.layout();
-        });
+    // let url = "https://wservice.viabicing.cat/v2/stations"
+    var url = "/assets/mock-bici.json";
+    fetch(url).then(function (response) {
+      if (response.ok) {
+        return response.json();
       }
+      return Promise.reject(Error("error"));
+    }).catch(function (error) {
+      return Promise.reject(Error(error.message));
+    }).then(function (res) {
+      var stations = res.stations;
+
+      _this2.setState({ listStations: stations });
     });
   };
 
-  dialog__createClass(MDCDialog, [{
-    key: 'open',
-    get: function get() {
-      return this.foundation_.isOpen();
+  ListContainer.prototype.componentDidUpdate = function componentDidUpdate(prevProps) {
+    if (prevProps.position !== this.props.position) {
+      if (typeof this.props.position.latitude !== "undefined") {
+        this.distanceToStation();
+      }
     }
-  }, {
-    key: 'acceptButton_',
-    get: function get() {
-      return this.root_.querySelector(foundation_MDCDialogFoundation.strings.ACCEPT_SELECTOR);
-    }
-  }, {
-    key: 'dialogSurface_',
-    get: function get() {
-      return this.root_.querySelector(foundation_MDCDialogFoundation.strings.DIALOG_SURFACE_SELECTOR);
-    }
-  }]);
+  };
 
-  return MDCDialog;
-}(component);
+  ListContainer.prototype.distanceToStation = function distanceToStation() {
+    var _this3 = this;
+
+    var newListStations = this.state.listStations.map(function (el) {
+      var positionUser = {
+        latitude: _this3.props.position.latitude,
+        longitude: _this3.props.position.longitude
+      };
+      var distance = geolib_default.a.getDistance(positionUser, {
+        latitude: el.latitude,
+        longitude: el.longitude
+      });
+      el.distance = distance;
+      return el;
+    });
+    this.setState({
+      listStations: newListStations.sort(function (prev, next) {
+        return prev.distance - next.distance;
+      })
+    });
+    console.log(this.state);
+  };
+
+  ListContainer.prototype.render = function render() {
+    return Object(preact_min["h"])(
+      preact_material_components_List,
+      { "two-line": "true" },
+      this.state.listStations.map(function (el) {
+        return Object(preact_min["h"])(
+          preact_material_components_List.Item,
+          null,
+          Object(preact_min["h"])(
+            preact_material_components_List.TextContainer,
+            null,
+            Object(preact_min["h"])(
+              preact_material_components_List.PrimaryText,
+              null,
+              el.streetName,
+              ", ",
+              el.streetNumber
+            ),
+            Object(preact_min["h"])(
+              preact_material_components_List.SecondaryText,
+              null,
+              el.bikes,
+              " \uD83D\uDEB2 - ",
+              el.slots,
+              " \uD83C\uDD7F\uFE0F - Distance: ",
+              el.distance,
+              " "
+            )
+          )
+        );
+      })
+    );
+  };
+
+  return ListContainer;
+}(preact_min["Component"]);
+
+
+// CONCATENATED MODULE: ./routes/home/index.js
+
+
+function home__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function home__possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function home__inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+
+
+
+
+
+
+var home_Home = function (_Component) {
+  home__inherits(Home, _Component);
+
+  function Home() {
+    var _temp, _this, _ret;
+
+    home__classCallCheck(this, Home);
+
+    for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+
+    return _ret = (_temp = (_this = home__possibleConstructorReturn(this, _Component.call.apply(_Component, [this].concat(args))), _this), _this.state = {
+      position: {}
+    }, _temp), home__possibleConstructorReturn(_this, _ret);
+  }
+
+  Home.prototype.getPosition = function getPosition(options) {
+    return new Promise(function (resolve, reject) {
+      navigator.geolocation.watchPosition(resolve, reject, options);
+    });
+  };
+
+  Home.prototype.componentDidMount = function componentDidMount() {
+    var _this2 = this;
+
+    var options = {
+      enableHighAccuracy: true,
+      timeout: 5000,
+      maximumAge: 0
+    };
+    this.getPosition(options).then(function (position) {
+      _this2.setState({
+        position: position.coords
+      });
+    }).catch(function (err) {
+      console.error(err.message);
+    });
+  };
+
+  Home.prototype.render = function render() {
+    return Object(preact_min["h"])(
+      "div",
+      { "class": home_style_default.a.home },
+      Object(preact_min["h"])(list_container_ListContainer, { position: this.state.position })
+    );
+  };
+
+  return Home;
+}(preact_min["Component"]);
+
+
 // CONCATENATED MODULE: ../node_modules/preact-material-components/Icon/index.js
 function Icon__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
@@ -4805,698 +5896,6 @@ var ButtonIcon = function (_Icon) {
 
 Button_Button.Icon = ButtonIcon;
 /* harmony default export */ var preact_material_components_Button = (Button_Button);
-// CONCATENATED MODULE: ../node_modules/preact-material-components/Dialog/index.js
-function Dialog__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function Dialog__possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function Dialog__inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-var Dialog__extends = Object.assign || function (target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i];for (var key in source) {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        target[key] = source[key];
-      }
-    }
-  }return target;
-};
-
-
-
-
-
-/**
- */
-
-var Dialog_Dialog = function (_MaterialComponent) {
-  Dialog__inherits(Dialog, _MaterialComponent);
-
-  function Dialog() {
-    Dialog__classCallCheck(this, Dialog);
-
-    var _this = Dialog__possibleConstructorReturn(this, _MaterialComponent.call(this));
-
-    _this.componentName = "dialog";
-    _this._onAccept = _this._onAccept.bind(_this);
-    _this._onCancel = _this._onCancel.bind(_this);
-    return _this;
-  }
-
-  Dialog.prototype.componentDidMount = function componentDidMount() {
-    this.MDComponent = new dialog_MDCDialog(this.control);
-    this.MDComponent.listen("MDCDialog:accept", this._onAccept);
-    this.MDComponent.listen("MDCDialog:cancel", this._onCancel);
-  };
-
-  Dialog.prototype.componentWillUnmount = function componentWillUnmount() {
-    this.MDComponent.unlisten("MDCDialog:accept", this._onAccept);
-    this.MDComponent.unlisten("MDCDialog:cancel", this._onCancel);
-    this.MDComponent.destroy && this.MDComponent.destroy();
-  };
-
-  Dialog.prototype._onAccept = function _onAccept(e) {
-    if (this.props.onAccept) {
-      this.props.onAccept(e);
-    }
-  };
-
-  Dialog.prototype._onCancel = function _onCancel(e) {
-    if (this.props.onCancel) {
-      this.props.onCancel(e);
-    }
-  };
-
-  Dialog.prototype.materialDom = function materialDom(props) {
-    var _this2 = this;
-
-    return Object(preact_min["h"])("aside", Dialog__extends({
-      role: "alertdialog",
-      ref: function ref(control) {
-        _this2.control = control;
-      }
-    }, props), Object(preact_min["h"])("div", { className: "mdc-dialog__surface" }, props.children), Object(preact_min["h"])("div", { className: "mdc-dialog__backdrop" }));
-  };
-
-  return Dialog;
-}(MaterialComponent_MaterialComponent);
-
-var Dialog_DialogHeader = function (_MaterialComponent2) {
-  Dialog__inherits(DialogHeader, _MaterialComponent2);
-
-  function DialogHeader() {
-    Dialog__classCallCheck(this, DialogHeader);
-
-    var _this3 = Dialog__possibleConstructorReturn(this, _MaterialComponent2.call(this));
-
-    _this3.componentName = "dialog__header";
-    return _this3;
-  }
-
-  DialogHeader.prototype.materialDom = function materialDom(props) {
-    return Object(preact_min["h"])("header", props, Object(preact_min["h"])("h2", { className: "mdc-dialog__header__title" }, props.children));
-  };
-
-  return DialogHeader;
-}(MaterialComponent_MaterialComponent);
-
-/**
- * @prop scrollable = false
- */
-
-
-var Dialog_DialogBody = function (_MaterialComponent3) {
-  Dialog__inherits(DialogBody, _MaterialComponent3);
-
-  function DialogBody() {
-    Dialog__classCallCheck(this, DialogBody);
-
-    var _this4 = Dialog__possibleConstructorReturn(this, _MaterialComponent3.call(this));
-
-    _this4.componentName = "dialog__body";
-    _this4._mdcProps = ["scrollable"];
-    return _this4;
-  }
-
-  DialogBody.prototype.materialDom = function materialDom(props) {
-    return Object(preact_min["h"])("section", props, props.children);
-  };
-
-  return DialogBody;
-}(MaterialComponent_MaterialComponent);
-
-var Dialog_DialogFooter = function (_MaterialComponent4) {
-  Dialog__inherits(DialogFooter, _MaterialComponent4);
-
-  function DialogFooter() {
-    Dialog__classCallCheck(this, DialogFooter);
-
-    var _this5 = Dialog__possibleConstructorReturn(this, _MaterialComponent4.call(this));
-
-    _this5.componentName = "dialog__footer";
-    return _this5;
-  }
-
-  DialogFooter.prototype.materialDom = function materialDom(props) {
-    return Object(preact_min["h"])("footer", props, props.children);
-  };
-
-  return DialogFooter;
-}(MaterialComponent_MaterialComponent);
-
-/**
- * @prop cancel = false
- * @prop accept = false
- */
-
-
-var Dialog_DialogFooterButton = function (_Button) {
-  Dialog__inherits(DialogFooterButton, _Button);
-
-  function DialogFooterButton() {
-    Dialog__classCallCheck(this, DialogFooterButton);
-
-    var _this6 = Dialog__possibleConstructorReturn(this, _Button.call(this));
-
-    _this6.componentName = "dialog__footer__button";
-    _this6._mdcProps = ["cancel", "accept"];
-    return _this6;
-  }
-
-  DialogFooterButton.prototype.materialDom = function materialDom(props) {
-    var _this7 = this;
-
-    return Object(preact_min["h"])("button", Dialog__extends({}, props, {
-      className: "mdc-button",
-      ref: function ref(control) {
-        _this7.control = control;
-      }
-    }), props.children);
-  };
-
-  return DialogFooterButton;
-}(preact_material_components_Button);
-
-Dialog_Dialog.Header = Dialog_DialogHeader;
-Dialog_Dialog.Body = Dialog_DialogBody;
-Dialog_Dialog.Footer = Dialog_DialogFooter;
-Dialog_Dialog.FooterButton = Dialog_DialogFooterButton;
-
-/* harmony default export */ var preact_material_components_Dialog = (Dialog_Dialog);
-// CONCATENATED MODULE: ../node_modules/preact-material-components/Switch/index.js
-function Switch__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function Switch__possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function Switch__inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-var Switch__extends = Object.assign || function (target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i];for (var key in source) {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        target[key] = source[key];
-      }
-    }
-  }return target;
-};
-
-function _objectWithoutProperties(obj, keys) {
-  var target = {};for (var i in obj) {
-    if (keys.indexOf(i) >= 0) continue;if (!Object.prototype.hasOwnProperty.call(obj, i)) continue;target[i] = obj[i];
-  }return target;
-}
-
-
-
-
-/**
- * @prop disabled = false
- */
-
-var Switch_Switch = function (_MaterialComponent) {
-  Switch__inherits(Switch, _MaterialComponent);
-
-  function Switch() {
-    Switch__classCallCheck(this, Switch);
-
-    var _this = Switch__possibleConstructorReturn(this, _MaterialComponent.call(this));
-
-    _this.componentName = "switch";
-    _this._mdcProps = ["disabled"];
-    return _this;
-  }
-
-  Switch.prototype.materialDom = function materialDom(allprops) {
-    var className = allprops.className,
-        props = _objectWithoutProperties(allprops, ["className"]);
-
-    return Object(preact_min["h"])("div", { className: className }, Object(preact_min["h"])("input", Switch__extends({
-      type: "checkbox",
-      className: "mdc-switch__native-control"
-    }, props)), Object(preact_min["h"])("div", { className: "mdc-switch__background" }, Object(preact_min["h"])("div", { className: "mdc-switch__knob" })));
-  };
-
-  return Switch;
-}(MaterialComponent_MaterialComponent);
-
-
-// EXTERNAL MODULE: ../node_modules/preact-material-components/Switch/style.css
-var Switch_style = __webpack_require__("IpTH");
-var Switch_style_default = /*#__PURE__*/__webpack_require__.n(Switch_style);
-
-// EXTERNAL MODULE: ../node_modules/preact-material-components/Dialog/style.css
-var Dialog_style = __webpack_require__("sEh6");
-var Dialog_style_default = /*#__PURE__*/__webpack_require__.n(Dialog_style);
-
-// EXTERNAL MODULE: ../node_modules/preact-material-components/Drawer/style.css
-var Drawer_style = __webpack_require__("RYBc");
-var Drawer_style_default = /*#__PURE__*/__webpack_require__.n(Drawer_style);
-
-// EXTERNAL MODULE: ../node_modules/preact-material-components/List/style.css
-var List_style = __webpack_require__("u+vq");
-var List_style_default = /*#__PURE__*/__webpack_require__.n(List_style);
-
-// EXTERNAL MODULE: ../node_modules/preact-material-components/Toolbar/style.css
-var Toolbar_style = __webpack_require__("LbTS");
-var Toolbar_style_default = /*#__PURE__*/__webpack_require__.n(Toolbar_style);
-
-// EXTERNAL MODULE: ./components/header/style.css
-var header_style = __webpack_require__("u3et");
-var header_style_default = /*#__PURE__*/__webpack_require__.n(header_style);
-
-// CONCATENATED MODULE: ./components/header/index.js
-
-
-function header__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function header__possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function header__inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-var header__ref = Object(preact_min["h"])(
-	preact_material_components_Toolbar.Title,
-	null,
-	'Bici.work'
-);
-
-var header__ref2 = Object(preact_min["h"])(
-	preact_material_components_List.ItemIcon,
-	null,
-	'home'
-);
-
-var _ref3 = Object(preact_min["h"])(
-	preact_material_components_List.ItemIcon,
-	null,
-	'account_circle'
-);
-
-var header_Header = function (_Component) {
-	header__inherits(Header, _Component);
-
-	function Header() {
-		header__classCallCheck(this, Header);
-
-		return header__possibleConstructorReturn(this, _Component.apply(this, arguments));
-	}
-
-	Header.prototype.closeDrawer = function closeDrawer() {
-		this.drawer.MDComponent.open = false;
-		this.state = {
-			darkThemeEnabled: false
-		};
-	};
-
-	Header.prototype.render = function render() {
-		var _this2 = this;
-
-		return Object(preact_min["h"])(
-			'div',
-			null,
-			Object(preact_min["h"])(
-				preact_material_components_Toolbar,
-				{ className: 'toolbar' },
-				Object(preact_min["h"])(
-					preact_material_components_Toolbar.Row,
-					null,
-					Object(preact_min["h"])(
-						preact_material_components_Toolbar.Section,
-						{ 'align-start': true },
-						Object(preact_min["h"])(
-							preact_material_components_Toolbar.Icon,
-							{ menu: true, onClick: function onClick() {
-									_this2.drawer.MDComponent.open = true;
-								} },
-							'menu'
-						),
-						header__ref
-					)
-				)
-			),
-			Object(preact_min["h"])(
-				preact_material_components_Drawer.TemporaryDrawer,
-				{ ref: function ref(drawer) {
-						_this2.drawer = drawer;
-					} },
-				Object(preact_min["h"])(
-					preact_material_components_Drawer.TemporaryDrawerContent,
-					null,
-					Object(preact_min["h"])(
-						preact_material_components_List,
-						null,
-						Object(preact_min["h"])(
-							preact_material_components_List.LinkItem,
-							{ onClick: function onClick() {
-									route('/');_this2.closeDrawer();
-								} },
-							header__ref2,
-							'Home'
-						),
-						Object(preact_min["h"])(
-							preact_material_components_List.LinkItem,
-							{ onClick: function onClick() {
-									route('/profile');_this2.closeDrawer();
-								} },
-							_ref3,
-							'Profile'
-						)
-					)
-				)
-			)
-		);
-	};
-
-	return Header;
-}(preact_min["Component"]);
-
-
-// CONCATENATED MODULE: ../node_modules/preact-material-components/Card/index.js
-function Card__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function Card__possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function Card__inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-var Card__extends = Object.assign || function (target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i];for (var key in source) {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        target[key] = source[key];
-      }
-    }
-  }return target;
-};
-
-
-
-
-
-var Card = function (_MaterialComponent) {
-  Card__inherits(Card, _MaterialComponent);
-
-  function Card() {
-    Card__classCallCheck(this, Card);
-
-    var _this = Card__possibleConstructorReturn(this, _MaterialComponent.call(this));
-
-    _this.componentName = "card";
-    _this._mdcProps = ["theme-dark"];
-    return _this;
-  }
-
-  return Card;
-}(MaterialComponent_MaterialComponent);
-
-var Card_CardSection = function (_MaterialComponent2) {
-  Card__inherits(CardSection, _MaterialComponent2);
-
-  function CardSection() {
-    Card__classCallCheck(this, CardSection);
-
-    var _this2 = Card__possibleConstructorReturn(this, _MaterialComponent2.call(this));
-
-    _this2.componentName = "";
-    return _this2;
-  }
-
-  CardSection.prototype.materialDom = function materialDom(props) {
-    return Object(preact_min["h"])("section", props, props.children);
-  };
-
-  return CardSection;
-}(MaterialComponent_MaterialComponent);
-
-var CardPrimary = function (_CardSection) {
-  Card__inherits(CardPrimary, _CardSection);
-
-  function CardPrimary() {
-    Card__classCallCheck(this, CardPrimary);
-
-    var _this3 = Card__possibleConstructorReturn(this, _CardSection.call(this));
-
-    _this3.componentName = "card__primary";
-    return _this3;
-  }
-
-  return CardPrimary;
-}(Card_CardSection);
-
-var CardSupportingText = function (_CardSection2) {
-  Card__inherits(CardSupportingText, _CardSection2);
-
-  function CardSupportingText() {
-    Card__classCallCheck(this, CardSupportingText);
-
-    var _this4 = Card__possibleConstructorReturn(this, _CardSection2.call(this));
-
-    _this4.componentName = "card__supporting-text";
-    return _this4;
-  }
-
-  return CardSupportingText;
-}(Card_CardSection);
-
-var CardActions = function (_CardSection3) {
-  Card__inherits(CardActions, _CardSection3);
-
-  function CardActions() {
-    Card__classCallCheck(this, CardActions);
-
-    var _this5 = Card__possibleConstructorReturn(this, _CardSection3.call(this));
-
-    _this5.componentName = "card__actions";
-    _this5._mdcProps = ["vertical"];
-    return _this5;
-  }
-
-  return CardActions;
-}(Card_CardSection);
-
-var CardMedia = function (_CardSection4) {
-  Card__inherits(CardMedia, _CardSection4);
-
-  function CardMedia() {
-    Card__classCallCheck(this, CardMedia);
-
-    var _this6 = Card__possibleConstructorReturn(this, _CardSection4.call(this));
-
-    _this6.componentName = "card__media";
-    return _this6;
-  }
-
-  return CardMedia;
-}(Card_CardSection);
-
-var Card_CardAction = function (_Button) {
-  Card__inherits(CardAction, _Button);
-
-  function CardAction() {
-    Card__classCallCheck(this, CardAction);
-
-    var _this7 = Card__possibleConstructorReturn(this, _Button.call(this));
-
-    _this7.componentName = "card__action";
-    return _this7;
-  }
-
-  CardAction.prototype.materialDom = function materialDom(props) {
-    var _this8 = this;
-
-    return Object(preact_min["h"])("button", Card__extends({
-      className: "mdc-button mdc-button--compact"
-    }, props, {
-      ref: function ref(control) {
-        _this8.control = control;
-      }
-    }), props.children);
-  };
-
-  return CardAction;
-}(preact_material_components_Button);
-
-var Card_CardTitle = function (_MaterialComponent3) {
-  Card__inherits(CardTitle, _MaterialComponent3);
-
-  function CardTitle() {
-    Card__classCallCheck(this, CardTitle);
-
-    var _this9 = Card__possibleConstructorReturn(this, _MaterialComponent3.call(this));
-
-    _this9.componentName = "card__title";
-    _this9._mdcProps = ["large"];
-    return _this9;
-  }
-
-  CardTitle.prototype.materialDom = function materialDom(props) {
-    return Object(preact_min["h"])("h1", props, props.children);
-  };
-
-  return CardTitle;
-}(MaterialComponent_MaterialComponent);
-
-var Card_CardSubtitle = function (_MaterialComponent4) {
-  Card__inherits(CardSubtitle, _MaterialComponent4);
-
-  function CardSubtitle() {
-    Card__classCallCheck(this, CardSubtitle);
-
-    var _this10 = Card__possibleConstructorReturn(this, _MaterialComponent4.call(this));
-
-    _this10.componentName = "card__subtitle";
-    return _this10;
-  }
-
-  CardSubtitle.prototype.materialDom = function materialDom(props) {
-    return Object(preact_min["h"])("h2", props, props.children);
-  };
-
-  return CardSubtitle;
-}(MaterialComponent_MaterialComponent);
-
-var CardHorizontalBlock = function (_CardSection5) {
-  Card__inherits(CardHorizontalBlock, _CardSection5);
-
-  function CardHorizontalBlock() {
-    Card__classCallCheck(this, CardHorizontalBlock);
-
-    var _this11 = Card__possibleConstructorReturn(this, _CardSection5.call(this));
-
-    _this11.componentName = "card__horizontal-block";
-    return _this11;
-  }
-
-  return CardHorizontalBlock;
-}(Card_CardSection);
-
-var Card_CardMediaItem = function (_MaterialComponent5) {
-  Card__inherits(CardMediaItem, _MaterialComponent5);
-
-  function CardMediaItem() {
-    Card__classCallCheck(this, CardMediaItem);
-
-    var _this12 = Card__possibleConstructorReturn(this, _MaterialComponent5.call(this));
-
-    _this12.componentName = "card__media-item";
-    _this12._mdcProps = [];
-    return _this12;
-  }
-
-  CardMediaItem.prototype.materialDom = function materialDom(props) {
-    var className = "";
-    if (props.x) {
-      className = "mdc-card__media-item--" + props.x + "x";
-    }
-    return Object(preact_min["h"])("img", Card__extends({ className: className }, props));
-  };
-
-  return CardMediaItem;
-}(MaterialComponent_MaterialComponent);
-
-Card.Primary = CardPrimary;
-Card.SupportingText = CardSupportingText;
-Card.Actions = CardActions;
-Card.Action = Card_CardAction;
-Card.Media = CardMedia;
-Card.Title = Card_CardTitle;
-Card.Subtitle = Card_CardSubtitle;
-Card.HorizontalBlock = CardHorizontalBlock;
-Card.MediaItem = Card_CardMediaItem;
-
-/* harmony default export */ var preact_material_components_Card = (Card);
-// EXTERNAL MODULE: ../node_modules/preact-material-components/Card/style.css
-var Card_style = __webpack_require__("UlEV");
-var Card_style_default = /*#__PURE__*/__webpack_require__.n(Card_style);
-
-// EXTERNAL MODULE: ../node_modules/preact-material-components/Button/style.css
-var Button_style = __webpack_require__("aqQ4");
-var Button_style_default = /*#__PURE__*/__webpack_require__.n(Button_style);
-
-// EXTERNAL MODULE: ./routes/home/style.css
-var home_style = __webpack_require__("ZAL5");
-var home_style_default = /*#__PURE__*/__webpack_require__.n(home_style);
-
-// CONCATENATED MODULE: ./routes/home/index.js
-
-
-function home__classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function home__possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
-
-function home__inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-
-
-
-
-
-
-
-
-var home__ref = Object(preact_min["h"])(
-	preact_material_components_List,
-	{ 'two-line': 'true' },
-	Object(preact_min["h"])(
-		preact_material_components_List.Item,
-		null,
-		'Item1'
-	),
-	Object(preact_min["h"])(
-		preact_material_components_List.Item,
-		null,
-		'Item2'
-	),
-	Object(preact_min["h"])(
-		preact_material_components_List.Item,
-		null,
-		'Item3'
-	),
-	Object(preact_min["h"])(
-		preact_material_components_List.Item,
-		null,
-		'Item4'
-	),
-	Object(preact_min["h"])(
-		preact_material_components_List.Item,
-		null,
-		'Item5'
-	)
-);
-
-var home_Home = function (_Component) {
-	home__inherits(Home, _Component);
-
-	function Home() {
-		home__classCallCheck(this, Home);
-
-		return home__possibleConstructorReturn(this, _Component.apply(this, arguments));
-	}
-
-	Home.prototype.render = function render() {
-		return Object(preact_min["h"])(
-			'div',
-			{ 'class': home_style_default.a.home },
-			home__ref
-		);
-	};
-
-	return Home;
-}(preact_min["Component"]);
-
-
 // EXTERNAL MODULE: ./routes/profile/style.css
 var profile_style = __webpack_require__("Tv6c");
 var profile_style_default = /*#__PURE__*/__webpack_require__.n(profile_style);
@@ -5890,112 +6289,6 @@ var app_App = function (_Component) {
 
 /***/ }),
 
-/***/ "TO+D":
-/***/ (function(module, exports) {
-
-module.exports = function (el, options) {
-  options = options || {};
-
-  var elementDocument = el.ownerDocument;
-  var basicTabbables = [];
-  var orderedTabbables = [];
-
-  // A node is "available" if
-  // - it's computed style
-  var isUnavailable = createIsUnavailable(elementDocument);
-
-  var candidateSelectors = ['input', 'select', 'a[href]', 'textarea', 'button', '[tabindex]'];
-
-  var candidates = el.querySelectorAll(candidateSelectors);
-
-  if (options.includeContainer) {
-    var matches = Element.prototype.matches || Element.prototype.msMatchesSelector || Element.prototype.webkitMatchesSelector;
-
-    if (candidateSelectors.some(function (candidateSelector) {
-      return matches.call(el, candidateSelector);
-    })) {
-      candidates = Array.prototype.slice.apply(candidates);
-      candidates.unshift(el);
-    }
-  }
-
-  var candidate, candidateIndex;
-  for (var i = 0, l = candidates.length; i < l; i++) {
-    candidate = candidates[i];
-    candidateIndex = parseInt(candidate.getAttribute('tabindex'), 10) || candidate.tabIndex;
-
-    if (candidateIndex < 0 || candidate.tagName === 'INPUT' && candidate.type === 'hidden' || candidate.disabled || isUnavailable(candidate, elementDocument)) {
-      continue;
-    }
-
-    if (candidateIndex === 0) {
-      basicTabbables.push(candidate);
-    } else {
-      orderedTabbables.push({
-        index: i,
-        tabIndex: candidateIndex,
-        node: candidate
-      });
-    }
-  }
-
-  var tabbableNodes = orderedTabbables.sort(function (a, b) {
-    return a.tabIndex === b.tabIndex ? a.index - b.index : a.tabIndex - b.tabIndex;
-  }).map(function (a) {
-    return a.node;
-  });
-
-  Array.prototype.push.apply(tabbableNodes, basicTabbables);
-
-  return tabbableNodes;
-};
-
-function createIsUnavailable(elementDocument) {
-  // Node cache must be refreshed on every check, in case
-  // the content of the element has changed
-  var isOffCache = [];
-
-  // "off" means `display: none;`, as opposed to "hidden",
-  // which means `visibility: hidden;`. getComputedStyle
-  // accurately reflects visiblity in context but not
-  // "off" state, so we need to recursively check parents.
-
-  function isOff(node, nodeComputedStyle) {
-    if (node === elementDocument.documentElement) return false;
-
-    // Find the cached node (Array.prototype.find not available in IE9)
-    for (var i = 0, length = isOffCache.length; i < length; i++) {
-      if (isOffCache[i][0] === node) return isOffCache[i][1];
-    }
-
-    nodeComputedStyle = nodeComputedStyle || elementDocument.defaultView.getComputedStyle(node);
-
-    var result = false;
-
-    if (nodeComputedStyle.display === 'none') {
-      result = true;
-    } else if (node.parentNode) {
-      result = isOff(node.parentNode);
-    }
-
-    isOffCache.push([node, result]);
-
-    return result;
-  }
-
-  return function isUnavailable(node) {
-    if (node === elementDocument.documentElement) return false;
-
-    var computedStyle = elementDocument.defaultView.getComputedStyle(node);
-
-    if (isOff(node, computedStyle)) return true;
-
-    return computedStyle.visibility === 'hidden';
-  };
-}
-
-/***/ }),
-
 /***/ "Tv6c":
 /***/ (function(module, exports) {
 
@@ -6033,273 +6326,10 @@ module.exports = {"home":"home__MseGd"};
 
 /***/ }),
 
-/***/ "sEh6":
-/***/ (function(module, exports) {
-
-// removed by extract-text-webpack-plugin
-
-/***/ }),
-
 /***/ "u+vq":
 /***/ (function(module, exports) {
 
 // removed by extract-text-webpack-plugin
-
-/***/ }),
-
-/***/ "u3et":
-/***/ (function(module, exports) {
-
-// removed by extract-text-webpack-plugin
-
-/***/ }),
-
-/***/ "ySUw":
-/***/ (function(module, exports, __webpack_require__) {
-
-var tabbable = __webpack_require__("TO+D");
-
-var listeningFocusTrap = null;
-
-function focusTrap(element, userOptions) {
-  var tabbableNodes = [];
-  var firstTabbableNode = null;
-  var lastTabbableNode = null;
-  var nodeFocusedBeforeActivation = null;
-  var active = false;
-  var paused = false;
-  var tabEvent = null;
-
-  var container = typeof element === 'string' ? document.querySelector(element) : element;
-
-  var config = userOptions || {};
-  config.returnFocusOnDeactivate = userOptions && userOptions.returnFocusOnDeactivate !== undefined ? userOptions.returnFocusOnDeactivate : true;
-  config.escapeDeactivates = userOptions && userOptions.escapeDeactivates !== undefined ? userOptions.escapeDeactivates : true;
-
-  var trap = {
-    activate: activate,
-    deactivate: deactivate,
-    pause: pause,
-    unpause: unpause
-  };
-
-  return trap;
-
-  function activate(activateOptions) {
-    if (active) return;
-
-    var defaultedActivateOptions = {
-      onActivate: activateOptions && activateOptions.onActivate !== undefined ? activateOptions.onActivate : config.onActivate
-    };
-
-    active = true;
-    paused = false;
-    nodeFocusedBeforeActivation = document.activeElement;
-
-    if (defaultedActivateOptions.onActivate) {
-      defaultedActivateOptions.onActivate();
-    }
-
-    addListeners();
-    return trap;
-  }
-
-  function deactivate(deactivateOptions) {
-    if (!active) return;
-
-    var defaultedDeactivateOptions = {
-      returnFocus: deactivateOptions && deactivateOptions.returnFocus !== undefined ? deactivateOptions.returnFocus : config.returnFocusOnDeactivate,
-      onDeactivate: deactivateOptions && deactivateOptions.onDeactivate !== undefined ? deactivateOptions.onDeactivate : config.onDeactivate
-    };
-
-    removeListeners();
-
-    if (defaultedDeactivateOptions.onDeactivate) {
-      defaultedDeactivateOptions.onDeactivate();
-    }
-
-    if (defaultedDeactivateOptions.returnFocus) {
-      setTimeout(function () {
-        tryFocus(nodeFocusedBeforeActivation);
-      }, 0);
-    }
-
-    active = false;
-    paused = false;
-    return this;
-  }
-
-  function pause() {
-    if (paused || !active) return;
-    paused = true;
-    removeListeners();
-  }
-
-  function unpause() {
-    if (!paused || !active) return;
-    paused = false;
-    addListeners();
-  }
-
-  function addListeners() {
-    if (!active) return;
-
-    // There can be only one listening focus trap at a time
-    if (listeningFocusTrap) {
-      listeningFocusTrap.pause();
-    }
-    listeningFocusTrap = trap;
-
-    updateTabbableNodes();
-    tryFocus(firstFocusNode());
-    document.addEventListener('focus', checkFocus, true);
-    document.addEventListener('click', checkClick, true);
-    document.addEventListener('mousedown', checkPointerDown, true);
-    document.addEventListener('touchstart', checkPointerDown, true);
-    document.addEventListener('keydown', checkKey, true);
-
-    return trap;
-  }
-
-  function removeListeners() {
-    if (!active || listeningFocusTrap !== trap) return;
-
-    document.removeEventListener('focus', checkFocus, true);
-    document.removeEventListener('click', checkClick, true);
-    document.removeEventListener('mousedown', checkPointerDown, true);
-    document.removeEventListener('touchstart', checkPointerDown, true);
-    document.removeEventListener('keydown', checkKey, true);
-
-    listeningFocusTrap = null;
-
-    return trap;
-  }
-
-  function getNodeForOption(optionName) {
-    var optionValue = config[optionName];
-    var node = optionValue;
-    if (!optionValue) {
-      return null;
-    }
-    if (typeof optionValue === 'string') {
-      node = document.querySelector(optionValue);
-      if (!node) {
-        throw new Error('`' + optionName + '` refers to no known node');
-      }
-    }
-    if (typeof optionValue === 'function') {
-      node = optionValue();
-      if (!node) {
-        throw new Error('`' + optionName + '` did not return a node');
-      }
-    }
-    return node;
-  }
-
-  function firstFocusNode() {
-    var node;
-    if (getNodeForOption('initialFocus') !== null) {
-      node = getNodeForOption('initialFocus');
-    } else if (container.contains(document.activeElement)) {
-      node = document.activeElement;
-    } else {
-      node = tabbableNodes[0] || getNodeForOption('fallbackFocus');
-    }
-
-    if (!node) {
-      throw new Error('You can\'t have a focus-trap without at least one focusable element');
-    }
-
-    return node;
-  }
-
-  // This needs to be done on mousedown and touchstart instead of click
-  // so that it precedes the focus event
-  function checkPointerDown(e) {
-    if (config.clickOutsideDeactivates && !container.contains(e.target)) {
-      deactivate({ returnFocus: false });
-    }
-  }
-
-  function checkClick(e) {
-    if (config.clickOutsideDeactivates) return;
-    if (container.contains(e.target)) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-  }
-
-  function checkFocus(e) {
-    if (container.contains(e.target)) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    // Checking for a blur method here resolves a Firefox issue (#15)
-    if (typeof e.target.blur === 'function') e.target.blur();
-
-    if (tabEvent) {
-      readjustFocus(tabEvent);
-    }
-  }
-
-  function checkKey(e) {
-    if (e.key === 'Tab' || e.keyCode === 9) {
-      handleTab(e);
-    }
-
-    if (config.escapeDeactivates !== false && isEscapeEvent(e)) {
-      deactivate();
-    }
-  }
-
-  function handleTab(e) {
-    updateTabbableNodes();
-
-    if (e.target.hasAttribute('tabindex') && Number(e.target.getAttribute('tabindex')) < 0) {
-      return tabEvent = e;
-    }
-
-    e.preventDefault();
-    var currentFocusIndex = tabbableNodes.indexOf(e.target);
-
-    if (e.shiftKey) {
-      if (e.target === firstTabbableNode || tabbableNodes.indexOf(e.target) === -1) {
-        return tryFocus(lastTabbableNode);
-      }
-      return tryFocus(tabbableNodes[currentFocusIndex - 1]);
-    }
-
-    if (e.target === lastTabbableNode) return tryFocus(firstTabbableNode);
-
-    tryFocus(tabbableNodes[currentFocusIndex + 1]);
-  }
-
-  function updateTabbableNodes() {
-    tabbableNodes = tabbable(container);
-    firstTabbableNode = tabbableNodes[0];
-    lastTabbableNode = tabbableNodes[tabbableNodes.length - 1];
-  }
-
-  function readjustFocus(e) {
-    if (e.shiftKey) return tryFocus(lastTabbableNode);
-
-    tryFocus(firstTabbableNode);
-  }
-}
-
-function isEscapeEvent(e) {
-  return e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27;
-}
-
-function tryFocus(node) {
-  if (!node || !node.focus) return;
-  if (node === document.activeElement) return;
-
-  node.focus();
-  if (node.tagName.toLowerCase() === 'input') {
-    node.select();
-  }
-}
-
-module.exports = focusTrap;
 
 /***/ })
 
