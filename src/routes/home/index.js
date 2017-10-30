@@ -3,20 +3,42 @@ import Card from 'preact-material-components/Card';
 import 'preact-material-components/Card/style.css';
 import 'preact-material-components/Button/style.css';
 import style from './style';
-import List from 'preact-material-components/List';
-import 'preact-material-components/List/style.css';
+import idbKeyval from 'idb-keyval';
+
+import ListContainer from '../../components/list-container/index';
 
 export default class Home extends Component {
+	state = {
+		position: {}
+	}
+	getPosition(options) {
+		return new Promise(function (resolve, reject) {
+			navigator.geolocation.watchPosition(resolve, reject, options);
+		});
+	}
+
+	componentDidMount() {
+		let options = {
+			enableHighAccuracy: true,
+			timeout: 5000,
+			maximumAge: 0
+		};
+		this.getPosition()
+		.then((position) => {
+			console.log(position)
+			this.setState({
+				position: position.coords
+			})
+		})
+		.catch((err) => {
+			console.error(err.message);
+	});
+	}
+	
 	render() {
 		return (
 			<div class={style.home}>
-				<List two-line="true">
-					<List.Item>Item1</List.Item>
-					<List.Item>Item2</List.Item>
-					<List.Item>Item3</List.Item>
-					<List.Item>Item4</List.Item>
-					<List.Item>Item5</List.Item>
-				</List>
+				<ListContainer position={this.state.position}/>
 			</div>
 		);
 	}
