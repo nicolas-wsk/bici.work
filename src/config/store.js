@@ -16,7 +16,7 @@ const reducer = persistCombineReducers(config,{app})
 
 export function configureStore () {
   // ...
-  let store = createStore(reducer, window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__());
+  let store = createStore(reducer, typeof window !== 'undefined' && window.__REDUX_DEVTOOLS_EXTENSION__ && window.__REDUX_DEVTOOLS_EXTENSION__());
 
   let persistor = persistStore(store)
   
