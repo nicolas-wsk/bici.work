@@ -58,7 +58,7 @@ export default class ListContainer extends Component {
   }
 
   distanceToStation(position, stations) {
-    let newListStations = stations
+    let newListStations = stations || this.props.app.stations
       .map(el => {
         let distance = geolib.getDistance(position, {
           latitude: el.latitude,
