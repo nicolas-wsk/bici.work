@@ -18,8 +18,8 @@ export default class ListContainer extends Component {
   }
 
   componentDidMount() {
-    // let url = "https://wservice.viabicing.cat/v2/stations"
-    let url = "/assets/mock-bici.json"
+    let url = "https://wservice.viabicing.cat/v2/stations"
+    // let url = "/assets/mock-bici.json"
     fetch(url)
       .then(response => {
         if (response.ok) {
