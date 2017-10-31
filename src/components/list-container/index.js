@@ -11,14 +11,10 @@ import * as actions from "../../config/actions"
 
 @connect(reduce, bindActions(actions))
 export default class ListContainer extends Component {
-  getPosition(options) {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.watchPosition(resolve, reject, options)
-    })
-  }
 
   componentDidMount() {
-    let url = "https://wservice.viabicing.cat/v2/stations"
+    let url =
+      "https://cors-anywhere.herokuapp.com/https://wservice.viabicing.cat/v2/stations"
     // let url = "/assets/mock-bici.json"
     fetch(url)
       .then(response => {
@@ -41,24 +37,24 @@ export default class ListContainer extends Component {
           maximumAge: 0
         }
         // this.props.addStations(stations)
-        this.getPosition(options)
-        .then(position => {
+        navigator.geolocation.watchPosition(
+          position => {
             let positionObj = {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude
             }
             console.log(positionObj)
             this.props.addPosition(positionObj)
-            this.distanceToStation(positionObj, stations)        
-          })
-          .catch(err => {
-            console.error(err.message)
-          })
+            this.distanceToStation(positionObj, stations)
+          },
+          err => console.error(err.message),
+          options
+        )
       })
   }
 
   distanceToStation(position, stations) {
-    let newListStations = stations || this.props.app.stations
+    let newListStations = stations
       .map(el => {
         let distance = geolib.getDistance(position, {
           latitude: el.latitude,
