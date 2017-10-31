@@ -4,9 +4,17 @@ import List from "preact-material-components/List"
 import "preact-material-components/List/style.css"
 import geolib from "geolib"
 
+import { connect } from "preact-redux"
+import { bindActions } from "../../config/utils"
+import reduce from "../../config/reducers"
+import * as actions from "../../config/actions"
+
+@connect(reduce, bindActions(actions))
 export default class ListContainer extends Component {
-  state = {
-    listStations: []
+  getPosition(options) {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.watchPosition(resolve, reject, options)
+    })
   }
 
   componentDidMount() {
@@ -23,54 +31,67 @@ export default class ListContainer extends Component {
         return Promise.reject(Error(error.message))
       })
       .then(res => {
-        const { stations } = res
-        this.setState({ listStations: stations })
+        let { stations } = res
+        stations = stations.filter(
+          el => el.type === "BIKE" && el.status === "OPN" && el.bikes > 0
+        )
+        let options = {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+        // this.props.addStations(stations)
+        this.getPosition(options)
+        .then(position => {
+            let positionObj = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            }
+            console.log(positionObj)
+            this.props.addPosition(positionObj)
+            this.distanceToStation(positionObj, stations)        
+          })
+          .catch(err => {
+            console.error(err.message)
+          })
       })
   }
 
-  componentDidUpdate(prevProps) {
-    if (prevProps.position !== this.props.position) {
-      if (typeof this.props.position.latitude !== "undefined") {
-        this.distanceToStation()
-      }
-    }
-  }
-
-  distanceToStation() {
-    let newListStations = this.state.listStations.map(el => {
-      let positionUser = {
-        latitude: this.props.position.latitude,
-        longitude: this.props.position.longitude
-      }
-      let distance = geolib.getDistance(positionUser, {
-        latitude: el.latitude,
-        longitude: el.longitude
+  distanceToStation(position, stations) {
+    let newListStations = stations
+      .map(el => {
+        let distance = geolib.getDistance(position, {
+          latitude: el.latitude,
+          longitude: el.longitude
+        })
+        el.distance = distance
+        return el
       })
-      el.distance = distance
-      return el
-    })
-    this.setState({
-      listStations: newListStations.sort(
-        (prev, next) => prev.distance - next.distance
-      )
-    })
-    console.log(this.state)
+      .filter(el => el.distance < 600)
+      .sort((prev, next) => prev.distance - next.distance)
+
+    this.props.addStations(newListStations)
   }
 
   render() {
     return (
       <List two-line="true">
-        {this.state.listStations.map(el => {
+        {this.props.app.stations.map(el => {
           return (
-            <List.Item>
-              <List.TextContainer>
-                <List.PrimaryText>
-                  {el.streetName}, {el.streetNumber}
-                </List.PrimaryText>
-                <List.SecondaryText>
-                  {el.bikes} 🚲 - {el.slots} 🅿️ - Distance: {el.distance}{" "}
-                </List.SecondaryText>
-              </List.TextContainer>
+            <List.Item className="Station">
+              <a
+                href={`http://maps.google.com/?q=${el.streetName} ${el.streetNumber} Barcelona`}
+              >
+                <List.TextContainer>
+                  <List.PrimaryText>
+                    {el.streetName}, {el.streetNumber}
+                  </List.PrimaryText>
+                  <List.SecondaryText>
+                    {el.bikes} 🚲 &nbsp;- {el.slots} 🅿️ &nbsp;- Distance:{" "}
+                    {el.distance}m{" "}
+                  </List.SecondaryText>
+                </List.TextContainer>
+              </a>
             </List.Item>
           )
         })}

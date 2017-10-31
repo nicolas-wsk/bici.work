@@ -52,3 +52,15 @@ html, body {
 :root {
   --mdc-theme-primary: #E3001B;
 }
+
+.mdc-list-item.Station {
+  /* height: 70px; */
+  padding: 40px 0;
+  font-size: 1.2rem;
+  line-height: 1.8rem;
+}
+
+a {
+  color: inherit; 
+  text-decoration: inherit;
+}

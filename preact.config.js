@@ -4,7 +4,11 @@ export default function (config) {
   const precacheConfig = {
     runtimeCaching: [{
       urlPattern: /assets\/*.json/,
-      handler: 'networkFirst'
+      handler: 'fastest'
+    },
+    {
+      urlPattern: /https?:\/\/fonts.+/,
+      handler: 'fastest'
     }],
     filename: 'sw.js',
     clientsClaim: true,
