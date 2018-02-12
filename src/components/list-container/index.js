@@ -76,7 +76,7 @@ export default class ListContainer extends Component {
           return (
             <List.Item className="Station">
               <a
-                href={`http://maps.google.com/?q=${el.streetName} ${el.streetNumber} Barcelona`}
+                href={`https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=${el.streetName} ${el.streetNumber} Barcelona`}
               >
                 <List.TextContainer>
                   <List.PrimaryText>
